@@ -107,11 +107,11 @@ Tekan Start setelah logcat berjalan. `PulseStageHealth` mencatat kemampuan peran
 
 ```bash
 cd apps/wear
-./gradlew testDebugUnitTest assembleDebug -PbackendUrl=https://ps.triyadi.dev
+./gradlew testDebugUnitTest assembleDebug -PbackendUrl=https://ps.triyadi.dev &&
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
 
-Dependensi `com.google.guava:listenablefuture:1.0` dideklarasikan eksplisit karena API Health Services memakainya pada tipe hasil asynchronous. Lihat [panduan ExerciseClient](https://developer.android.com/health-and-fitness/health-services/active-data). APK debug hasil percobaan lama bukan build Health Services terbaru; gunakan output Gradle di atas.
+Dependensi `com.google.guava:guava:32.0.1-android` dideklarasikan eksplisit pada `implementation`, mengikuti versi yang dipakai Health Services. Ini menyediakan `ListenableFuture` saat kompilasi maupun runtime. Dependensi standalone `listenablefuture:1.0` saja tidak cukup: resolusi Gradle dapat memilih artefak kosong `9999.0-empty-to-avoid-conflict-with-guava`, sementara Guava dari Health Services hanya tersedia pada runtime. Lihat [panduan ExerciseClient](https://developer.android.com/health-and-fitness/health-services/active-data). APK debug hasil percobaan lama bukan build Health Services terbaru; gunakan output Gradle di atas. Operator `&&` mencegah instalasi APK ketika build gagal.
 
 ## OBS
 

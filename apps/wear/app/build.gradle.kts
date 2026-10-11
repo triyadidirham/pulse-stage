@@ -5,8 +5,9 @@ plugins {
 
 dependencies {
     implementation("androidx.health:health-services-client:1.1.0")
-    // Health Services exposes this type, but declares it only as a runtime dependency.
-    implementation("com.google.guava:listenablefuture:1.0")
+    // Health Services brings Guava at runtime. Declare it here too so ListenableFuture
+    // remains on the compile classpath when Gradle selects the empty standalone artifact.
+    implementation("com.google.guava:guava:32.0.1-android")
     testImplementation("junit:junit:4.13.2")
 }
 

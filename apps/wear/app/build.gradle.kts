@@ -3,6 +3,10 @@ plugins {
     id("org.jetbrains.kotlin.android")
 }
 
+dependencies {
+    testImplementation("junit:junit:4.13.2")
+}
+
 val backendUrl = providers.gradleProperty("backendUrl").orElse("https://example.invalid").get().trim().trimEnd('/')
 require(backendUrl.matches(Regex("https?://[a-zA-Z0-9.-]+(?::[0-9]+)?"))) {
     "backendUrl must be an HTTP(S) origin without a path, for example http://192.168.10.6:3000 (debug) or https://pulse.example.com (release)."

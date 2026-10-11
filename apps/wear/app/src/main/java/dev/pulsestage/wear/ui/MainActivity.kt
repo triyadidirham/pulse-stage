@@ -57,13 +57,14 @@ class MainActivity : Activity() {
     private val tick = object : Runnable {
         override fun run() {
             val running = HeartRateService.running
-            if (previousRunning && !running) status.text = HeartRateService.message
+            if (previousRunning && !running) status.text = HeartRateService.statusMessage
             previousRunning = running
-            if (running) status.text = HeartRateService.message
-            else if (api.ingestToken.isEmpty() && paired) {
+            if (running) status.text = HeartRateService.statusMessage
+            else if (HeartRateService.startFailure != null) status.text = HeartRateService.startFailure
+            if (!running && api.ingestToken.isEmpty() && paired) {
                 paired = false
                 code.text = ""
-                status.text = HeartRateService.message
+                status.text = HeartRateService.statusMessage
             }
             if (!running && !paired && api.pairingCode.isNotEmpty()) showPairingLink()
             refreshControls()
@@ -183,8 +184,8 @@ class MainActivity : Activity() {
         val running = HeartRateService.running
         val fresh = SystemClock.elapsedRealtime() - HeartRateService.lastMeasurement < 15_000
         val value = if (running && fresh) HeartRateService.bpm else null
-        val live = value != null && HeartRateService.message == "BPM terkirim"
-        dial.update(value, live, if (live) "● LIVE" else if (running) "MEMBACA SENSOR" else "HEART RATE")
+        val live = value != null && HeartRateService.statusMessage == "BPM terkirim"
+        dial.update(value, live, if (live) "● LIVE" else if (value != null) "BPM TERBACA" else if (running) "MEMBACA SENSOR" else "HEART RATE")
         dial.visibility = if (paired || running) View.VISIBLE else View.GONE
         start.visibility = if (paired || running) View.VISIBLE else View.GONE
         start.text = if (running) "■  Stop sesi" else "▶  Start"
@@ -255,7 +256,7 @@ class MainActivity : Activity() {
                 code.textSize = 16f
                 code.text = data.getString("playerName")
                 pairingHint.text = "Overlay siap digunakan.\nSalin tautannya dari web ke OBS."
-                if (!HeartRateService.running) status.text = "Siap untuk stream.\nTekan Start untuk berbagi."
+                if (!HeartRateService.running) status.text = HeartRateService.startFailure ?: "Siap untuk stream.\nTekan Start untuk berbagi."
                 if (!wasPaired) scroll.post { scroll.smoothScrollTo(0, 0) }
             } else {
                 status.text = "Hubungkan kode ini\nmelalui browser Anda."
@@ -314,6 +315,7 @@ class MainActivity : Activity() {
     private fun begin() {
         if (!paired || !consent || isFinishing) return
         consent = false
+        HeartRateService.startFailure = null
         try { startForegroundService(Intent(this, HeartRateService::class.java)); status.text = "Memulai sensor…" }
         catch (error: Exception) { status.text = error.message ?: "Tidak dapat memulai sesi." }
     }

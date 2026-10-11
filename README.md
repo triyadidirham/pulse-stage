@@ -89,9 +89,29 @@ Pada jam:
 
 Pemilihan server hanya tersedia di build debug. Pada rilis Play Store, alamat server tertanam saat build; pengguna cukup membuka tautan yang ditampilkan. Tidak perlu mengatur environment di jam. Reset pairing diperlukan sebelum mengganti server pada debug agar kredensial server lama tidak terkirim ke server lain.
 
+### Jika jam terus menunggu sensor
+
+Pada Android API 34, izin yang diperlukan adalah **Sensor tubuh** (`BODY_SENSORS`). Pastikan izin diberikan pada aplikasi PulseStage yang sedang dibuka; paket debug (`dev.pulsestage.wear.debug`) berbeda dari release (`dev.pulsestage.wear`). Gunakan aplikasi detak jantung bawaan sebagai pembanding, kemudian hentikan pengukurannya sebelum mencoba PulseStage.
+
+Aplikasi mencoba sensor heart rate wake-up terlebih dahulu jika tersedia, lalu sensor alternatif pada perangkat. Setelah 45 detik tanpa pembacaan valid, listener didaftarkan ulang, maksimal dua kali berturut-turut. Jika tetap tidak mendapat data, sesi dihentikan dengan pesan penyebab. Start memulai percobaan baru. Pembacaan lama, timestamp tidak valid, `NO_CONTACT`, dan `UNRELIABLE` tidak dikirim sebagai BPM. Keberhasilan pengecekan server tidak menghapus pesan masalah sensor.
+
+Untuk menelusuri masalah pada perangkat, jalankan log berikut **sebelum menekan Start** dan tunggu sampai pembacaan masuk atau sesi berhenti:
+
+```sh
+adb shell getprop ro.build.version.sdk
+adb shell dumpsys package dev.pulsestage.wear.debug | grep -E 'BODY_SENSORS|FOREGROUND_SERVICE_HEALTH'
+adb logcat -v time PulseStageSensor:I AndroidRuntime:E '*:S'
+```
+
+Ganti nama paket jika memakai release. Log `PulseStageSensor` mencatat registrasi, jenis sensor, status kualitas, dan percobaan ulang, tanpa nilai BPM maupun token. Gunakan build terbaru agar tag ini tersedia. Log kosong dari `SensorService`/`SensorManager` pada firmware tertentu belum membuktikan sensor bekerja atau gagal. Kecocokan dengan firmware Xiaomi Watch 2 Pro tetap perlu diuji pada jam fisik.
+
+Jalankan pengujian validasi pembacaan dengan `./gradlew testDebugUnitTest` dari `apps/wear/`. Aturan status/accuracy mengikuti [dokumentasi sensor heart rate Android](https://developer.android.com/reference/android/hardware/Sensor#TYPE_HEART_RATE).
+
 ### Artefak uji dari sesi pengembangan ini
 
 `apps/wear/app/build/outputs/apk/debug/pulsestage-ui-debug.apk`, bila tersedia, adalah APK dengan tampilan terbaru yang dikompilasi langsung memakai Kotlin compiler, AAPT2, D8, zipalign, dan apksigner lokal. APK ini memakai kunci debug Android lokal dan server uji `http://192.168.10.6:3000`. Gunakan nama file itu pada perintah `adb install` di atas. Ini bukan paket distribusi produksi dan belum diuji di jam fisik; build Gradle standar tetap perlu diverifikasi pada mesin tanpa pembatasan filesystem/socket.
+
+`apps/wear/app/build/outputs/apk/debug/pulsestage-sensor-debug.apk`, bila tersedia, menyertakan pemulihan/diagnostik sensor dan URL bawaan `https://ps.triyadi.dev`. Paket ini juga dikompilasi menggunakan tool SDK lokal dan ditandatangani dengan kunci debug, serta belum diverifikasi pada jam fisik. Pengaturan server yang sudah tersimpan di jam tetap memiliki prioritas.
 
 ## OBS
 

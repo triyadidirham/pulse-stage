@@ -130,6 +130,10 @@ Di lingkungan pembuatan ini, socket lokal diblokir (`EPERM`), sehingga preview b
 
 Lihat [panduan produksi dan Play Store](docs/production.md) untuk deployment HTTPS, batas prototipe, build AAB, dan persiapan rilis. Lihat [kontrak API](docs/api.md) jika ingin mengembangkan aplikasi pendamping atau integrasi lain.
 
+Deployment Compose menggunakan template `infra/.env.example`; salin ke `infra/.env` dan isi `DOMAIN` sesuai hostname VPS. Panduan produksi memuat langkah clone, menjalankan layanan, pengecekan HTTPS, serta update deployment.
+
+Pesan commit baru mengikuti [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/), misalnya `feat(web): add overlay color selection` atau `fix(wear): reconnect after a network interruption`. Aturan lengkap tersimpan di [AGENTS.md](AGENTS.md).
+
 ## Struktur proyek
 
 Proyek memakai satu repository dengan batas aplikasi yang terpisah. Web tetap berupa HTML/CSS/JavaScript native yang disajikan oleh server pada origin yang sama; tidak ada build frontend atau instalasi dependency tambahan.

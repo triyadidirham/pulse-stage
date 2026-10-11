@@ -14,20 +14,76 @@ Prototipe menggunakan Node.js 24, HTTP bawaan, SQLite, serta SSE satu arah. WebS
 
 ## Deployment awal satu server
 
-1. Siapkan domain milik Anda dan arahkan DNS ke VPS. Buka port 80/443 untuk Caddy dan biarkan port API hanya ada dalam jaringan container.
-2. Instal Docker dan Compose pada VPS, salin repository, lalu dari root proyek:
+1. Siapkan satu VPS Linux dan domain/subdomain, misalnya `pulse.domain-anda.com`. Arahkan record DNS **A** ke IPv4 VPS. Jika menggunakan record **AAAA**, pastikan IPv6 tersebut juga mengarah ke VPS dan bisa dijangkau. Izinkan koneksi TCP 80/443 ke Caddy; port API 3000 tetap berada dalam jaringan container.
+2. Instal Docker Engine beserta Compose plugin. Untuk Ubuntu, ikuti [instalasi resmi Docker](https://docs.docker.com/engine/install/ubuntu/). Pastikan akun deployment dapat menjalankan `docker version` dan `docker compose version`.
+3. Pastikan perubahan lokal sudah di-push ke GitHub, lalu clone repository pada VPS:
 
    ```sh
-   DOMAIN=pulse.domain-anda.com docker compose -f infra/compose.yaml up -d --build
+   git clone https://github.com/triyadidirham/pulse-stage.git
+   cd pulse-stage
+   cp infra/.env.example infra/.env
+   nano infra/.env
    ```
 
-3. Caddy mengurus HTTPS untuk domain tersebut dan meneruskan SSE tanpa buffering. Node memerlukan `PUBLIC_ORIGIN=https://domain` ketika `NODE_ENV=production`.
-4. Periksa `/healthz`, pairing, pengiriman dari jam, dan Browser Source OBS menggunakan koneksi internet terpisah. Jam harus bisa memverifikasi sertifikat TLS; jangan menonaktifkan verifikasi sertifikat.
-5. Tentukan pencadangan volume `pulse_data`, pemulihan, monitoring error dan uptime, pembaruan image/dependensi, serta kebijakan penghapusan backup. Log jangan mencatat header Authorization, body BPM, kode pairing, atau path yang mengandung kode akses overlay. Konfigurasi Caddy contoh tidak mengaktifkan access log; jika menambah proxy/CDN/analitik, redaksi atau matikan pencatatan URL rahasia tersebut.
+   Jika repository privat, siapkan autentikasi GitHub pada VPS, misalnya deploy key baca-saja, lalu gunakan URL clone SSH. Tidak perlu menyalin private key laptop ke VPS.
+
+   Ganti isi `infra/.env` dengan hostname sebenarnya, tanpa `https://` atau path:
+
+   ```dotenv
+   DOMAIN=pulse.domain-anda.com
+   ```
+
+   Template ini khusus deployment Compose. `.env.example` di root tetap digunakan untuk menjalankan Node.js secara langsung. File `infra/.env` diabaikan Git dan tidak ikut masuk ke image aplikasi karena Dockerfile hanya menyalin sumber aplikasi serta modul protokol.
+
+4. Dari root repository, validasi konfigurasi kemudian jalankan layanan:
+
+   ```sh
+   docker compose --env-file infra/.env -f infra/compose.yaml config --quiet
+   docker compose --env-file infra/.env -f infra/compose.yaml up -d --build
+   docker compose --env-file infra/.env -f infra/compose.yaml ps
+   ```
+
+   Compose menyiapkan `PUBLIC_ORIGIN=https://domain` secara otomatis. Image aplikasi menetapkan `NODE_ENV=production`. Caddy menerbitkan dan memperbarui sertifikat HTTPS setelah domain serta jaringan dapat diverifikasi, dan meneruskan SSE tanpa buffering. Lihat [persyaratan Automatic HTTPS Caddy](https://caddyserver.com/docs/automatic-https).
+
+5. Verifikasi dari komputer Anda:
+
+   ```sh
+   curl -fsS https://pulse.domain-anda.com/healthz
+   ```
+
+   Respons yang diharapkan adalah `{"ok":true}`. Buka `https://pulse.domain-anda.com`, lakukan pairing, lalu uji Start/Stop dari jam dan Browser Source OBS. Untuk melihat status saat troubleshooting, jalankan pada VPS:
+
+   ```sh
+   docker compose --env-file infra/.env -f infra/compose.yaml logs --tail=100 app proxy
+   ```
+
+6. Build aplikasi jam dari komputer pengembangan dengan domain yang sama sebelum pengujian:
+
+   ```sh
+   cd apps/wear
+   ./gradlew assembleDebug -PbackendUrl=https://pulse.domain-anda.com
+   adb install -r app/build/outputs/apk/debug/app-debug.apk
+   ```
+
+   Pada instalasi debug yang pernah menyimpan IP lokal secara manual, reset pairing lalu ubah **Server pengembangan** ke domain HTTPS. Nilai yang tersimpan di jam memiliki prioritas atas URL bawaan APK debug. Untuk distribusi Play Store, ikuti bagian paket rilis di bawah.
+
+7. Tentukan pencadangan volume `pulse_data`, pemulihan, monitoring error dan uptime, pembaruan image/dependensi, serta kebijakan penghapusan backup. Log jangan mencatat header Authorization, body BPM, kode pairing, atau path yang mengandung kode akses overlay. Konfigurasi Caddy contoh tidak mengaktifkan access log; jika menambah proxy/CDN/analitik, redaksi atau matikan pencatatan URL rahasia tersebut.
 
 Compose ini adalah konfigurasi awal yang belum diuji deployment dalam sesi pengembangan. Tetapkan versi/digest image yang sudah Anda uji sebelum rilis operasional.
 
 File Compose sekarang berada di `infra/compose.yaml`. Nama project tetap `deploy` untuk mempertahankan volume bawaan dari lokasi lama. Untuk instalasi yang memakai nama project khusus, pertahankan nilai `-p` atau `COMPOSE_PROJECT_NAME` sebelumnya saat menjalankan Compose dari lokasi baru.
+
+### Memperbarui deployment
+
+Setelah perubahan sudah di-push, jalankan dari root repository pada VPS:
+
+```sh
+git pull --ff-only origin main
+docker compose --env-file infra/.env -f infra/compose.yaml up -d --build
+docker compose --env-file infra/.env -f infra/compose.yaml ps
+```
+
+Volume database dan sertifikat tetap dipakai saat container dibuat ulang. Restart menghentikan sesi BPM yang ada di memori, sedangkan pairing tetap tersimpan di SQLite. Periksa kembali `/healthz` dan sesi jam setelah update. Jangan gunakan `down -v` untuk update rutin karena opsi tersebut menghapus named volumes.
 
 ## Batas sebelum membuka layanan ke banyak pengguna
 

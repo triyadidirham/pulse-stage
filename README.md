@@ -45,7 +45,7 @@ HOST=0.0.0.0 npm start
 
 Atur server pada **aplikasi jam debug** menjadi `http://IP-KOMPUTER:3000`. `localhost` pada jam menunjuk ke jam itu sendiri. Pastikan firewall dan jaringan tidak memblokir perangkat satu sama lain. Semua contoh HTTP hanya untuk pengujian lokal; build release memerlukan HTTPS.
 
-Variabel konfigurasi ada di `.env.example`. File `.env` tidak dimuat otomatis; gunakan variabel shell atau `node --env-file=.env server/main.mjs`. SQLite disimpan di `data/pulsestage.sqlite`, dengan kredensial berbentuk hash; jangan masukkan direktori tersebut ke Git.
+Variabel konfigurasi ada di `.env.example`. File `.env` tidak dimuat otomatis; gunakan variabel shell atau `node --env-file=.env apps/server/src/main.mjs`. Lokasi SQLite default tetap `data/pulsestage.sqlite` di root repository meskipun server dijalankan dari folder lain. `DATABASE_PATH` relatif mengikuti working directory proses. Database menyimpan registrasi perangkat, dengan kredensial berbentuk hash; jangan masukkan direktori tersebut ke Git.
 
 ## Mencoba tanpa smartwatch
 
@@ -59,10 +59,10 @@ Simulator mencetak tautan pairing. Buka tautan dan masukkan nama **DEMO** agar d
 
 ## Aplikasi Wear OS
 
-Buka folder `wear/` di Android Studio. Konfigurasi saat ini: Kotlin 2.1.20, Android Gradle Plugin 8.9.1, Gradle 8.12, compile/target SDK 36, min SDK 30. Gunakan JDK 17 atau yang kompatibel dan pasang Android SDK 36 serta Build Tools 36.0.0.
+Buka folder `apps/wear/` di Android Studio. Konfigurasi saat ini: Kotlin 2.1.20, Android Gradle Plugin 8.9.1, Gradle 8.12, compile/target SDK 36, min SDK 30. Gunakan JDK 17 atau yang kompatibel dan pasang Android SDK 36 serta Build Tools 36.0.0.
 
 ```sh
-cd wear
+cd apps/wear
 ./gradlew assembleDebug
 ```
 
@@ -72,7 +72,7 @@ Untuk menanam alamat server lokal langsung ke APK debug, gunakan (ganti IP sesua
 ./gradlew assembleDebug -PbackendUrl=http://192.168.10.6:3000
 ```
 
-Server menggunakan port `3000` secara default. APK berada di `wear/app/build/outputs/apk/debug/app-debug.apk`. `assembleDebug` menerima HTTP untuk pengujian lokal; `bundleRelease`/`assembleRelease` tetap memerlukan HTTPS. Jalankan server dengan `HOST=0.0.0.0 npm start` dari root proyek agar dapat dijangkau jam pada jaringan yang sama. Jika alamat server sudah ditanam, menu **Server pengembangan** tidak perlu diisi. Jika instalasi lama memiliki alamat yang pernah diatur manual, alamat tersimpan itu tetap dipakai sampai diubah dari menu tersebut.
+Server menggunakan port `3000` secara default. APK berada di `apps/wear/app/build/outputs/apk/debug/app-debug.apk`. `assembleDebug` menerima HTTP untuk pengujian lokal; `bundleRelease`/`assembleRelease` tetap memerlukan HTTPS. Jalankan server dengan `HOST=0.0.0.0 npm start` dari root proyek agar dapat dijangkau jam pada jaringan yang sama. Jika alamat server sudah ditanam, menu **Server pengembangan** tidak perlu diisi. Jika instalasi lama memiliki alamat yang pernah diatur manual, alamat tersimpan itu tetap dipakai sampai diubah dari menu tersebut.
 
 Pasang APK debug melalui Android Studio atau ADB yang sudah terhubung ke jam:
 
@@ -91,7 +91,7 @@ Pemilihan server hanya tersedia di build debug. Pada rilis Play Store, alamat se
 
 ### Artefak uji dari sesi pengembangan ini
 
-`wear/app/build/outputs/apk/debug/pulsestage-ui-debug.apk`, bila tersedia, adalah APK dengan tampilan terbaru yang dikompilasi langsung memakai Kotlin compiler, AAPT2, D8, zipalign, dan apksigner lokal. APK ini memakai kunci debug Android lokal dan server uji `http://192.168.10.6:3000`. Gunakan nama file itu pada perintah `adb install` di atas. Ini bukan paket distribusi produksi dan belum diuji di jam fisik; build Gradle standar tetap perlu diverifikasi pada mesin tanpa pembatasan filesystem/socket.
+`apps/wear/app/build/outputs/apk/debug/pulsestage-ui-debug.apk`, bila tersedia, adalah APK dengan tampilan terbaru yang dikompilasi langsung memakai Kotlin compiler, AAPT2, D8, zipalign, dan apksigner lokal. APK ini memakai kunci debug Android lokal dan server uji `http://192.168.10.6:3000`. Gunakan nama file itu pada perintah `adb install` di atas. Ini bukan paket distribusi produksi dan belum diuji di jam fisik; build Gradle standar tetap perlu diverifikasi pada mesin tanpa pembatasan filesystem/socket.
 
 ## OBS
 
@@ -122,7 +122,7 @@ npm test
 RUN_HTTP_TESTS=1 npm test
 ```
 
-Tes default menggunakan handler HTTP yang sebenarnya dengan request/response stream dalam proses, tanpa membuka port. Meliputi alur pairing, pemisahan hak kredensial, pengiriman melalui SSE, kedaluwarsa, Stop, rotasi URL, penghapusan, validasi input, pembatasan percobaan, dan persistensi database tanpa riwayat BPM.
+Tes default menggunakan handler HTTP yang sebenarnya dengan request/response stream dalam proses, tanpa membuka port. Meliputi alur pairing, pemisahan hak kredensial, pengiriman melalui SSE, kedaluwarsa, Stop, rotasi URL, penghapusan, validasi input, pembatasan percobaan, persistensi database tanpa riwayat BPM, lokasi database, serta pemuatan aset dan modul browser dari struktur baru.
 
 Di lingkungan pembuatan ini, socket lokal diblokir (`EPERM`), sehingga preview browser, transport HTTP nyata, dan Gradle daemon tidak dapat dijalankan. Kompilasi langsung Kotlin/resource Android serta verifikasi tanda tangan APK tidak menggantikan pengujian jam/OBS sebenarnya.
 
@@ -130,13 +130,66 @@ Di lingkungan pembuatan ini, socket lokal diblokir (`EPERM`), sehingga preview b
 
 Lihat [panduan produksi dan Play Store](docs/production.md) untuk deployment HTTPS, batas prototipe, build AAB, dan persiapan rilis. Lihat [kontrak API](docs/api.md) jika ingin mengembangkan aplikasi pendamping atau integrasi lain.
 
-Struktur proyek:
+## Struktur proyek
+
+Proyek memakai satu repository dengan batas aplikasi yang terpisah. Web tetap berupa HTML/CSS/JavaScript native yang disajikan oleh server pada origin yang sama; tidak ada build frontend atau instalasi dependency tambahan.
 
 ```text
-server/   HTTP API, SQLite, dan SSE
-web/      Dashboard pairing, overlay, dan penjelasan privasi prototipe
-wear/     Aplikasi native Wear OS
-tests/    Pengujian alur server
-scripts/  Simulator jam untuk pengembangan
-deploy/   Contoh deployment satu server dengan Docker Compose dan Caddy
+apps/
+  server/
+    src/
+      app.mjs                 HTTP API, sesi BPM, dan SSE
+      main.mjs                Entry point proses dan shutdown
+      config.mjs              Pembacaan environment dan lokasi database
+      db/                     Repository SQLite untuk registrasi perangkat
+      http/                   JSON dan penyajian aset web yang diizinkan
+      security/               Pembuatan kode/token dan hashing
+    tests/
+      helpers/                Fixture HTTP untuk tes integrasi
+      *.test.mjs              Tes API, konfigurasi, dan aset web
+  web/
+    public/
+      index.html              Dashboard studio
+      overlay.html            Browser Source OBS
+      privacy.html            Halaman privasi
+      assets/
+        css/                  Style studio dan overlay
+        js/                   Studio, overlay, dan koneksi SSE
+  wear/
+    app/src/main/
+      java/dev/pulsestage/wear/
+        data/                 API client dan penyimpanan koneksi
+        service/              Sensor serta foreground service
+        ui/                   Activity dan komponen tampilan jam
+      res/                    Resource Android
+    gradle/wrapper/           Gradle Wrapper
+packages/
+  protocol/
+    src/                      Aturan URL pairing/overlay yang dipakai bersama
+    tests/                    Tes helper protokol
+infra/
+  docker/Dockerfile           Image server dan web
+  compose.yaml                Deployment aplikasi, Caddy, dan volume
+  Caddyfile                   Reverse proxy HTTPS
+scripts/                      Simulator dan alat pengembangan
+docs/                        Kontrak API dan panduan produksi
+data/                        SQLite lokal (diabaikan Git)
+artifacts/                   Ekspor lokal (diabaikan Git)
 ```
+
+`packages/protocol` tidak mengimpor kode aplikasi, DOM, Node.js, atau kredensial. Server dan simulator mengimpor modul ini secara langsung; browser mengakses modul yang sama melalui `/shared/links.js`. Seluruh SQL berada di `apps/server/src/db`. API tetap di `app.mjs` agar alurnya mudah ditelusuri pada ukuran aplikasi saat ini. Tambahkan modul fitur ketika fitur baru membutuhkannya.
+
+Tes diletakkan bersama pemilik kodenya. Jalankan `npm test` untuk semua tes, `npm run test:server` untuk backend, atau `npm run test:protocol` untuk helper bersama. `.editorconfig` dan `.gitattributes` menetapkan indentasi serta akhir baris lintas platform.
+
+Folder Wear OS dibuka di Android Studio melalui **`apps/wear/`**. Namespace dan application ID tetap `dev.pulsestage.wear`; package kelas internal kini dipisahkan sesuai tanggung jawabnya. Data pairing yang tersimpan tidak dipindahkan. Output Gradle tetap berada di `apps/wear/app/build/`.
+
+Deployment dari root repository:
+
+```sh
+docker build -f infra/docker/Dockerfile -t pulsestage .
+DOMAIN=pulse.domain-anda.com docker compose -f infra/compose.yaml up -d --build
+```
+
+Nama project Compose dipatok ke `deploy`, sesuai nama bawaan folder deployment sebelumnya, supaya volume SQLite dan Caddy yang sudah ada tetap dipakai setelah pemindahan. Jika sebelumnya menggunakan `-p` atau `COMPOSE_PROJECT_NAME`, gunakan nama yang sama saat menjalankan perintah baru.
+
+File `.env`, database, keystore, cache, dan hasil build tidak dimasukkan ke Git. Folder `.gradle`, `.kotlin`, dan `app/build` milik instalasi lokal ikut berada di bawah `apps/wear` setelah pemindahan; jalankan build ulang dari lokasi baru untuk memperbarui output generated. URL pairing, URL OBS, dan endpoint API tetap sama.

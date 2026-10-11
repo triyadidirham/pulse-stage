@@ -1,5 +1,5 @@
 node_modules/
-data/
+/data/
 .env
 .env.*
 !.env.example
@@ -7,7 +7,7 @@ data/
 .agents/
 .codex/
 .aws/
-artifacts/
+/artifacts/
 **/.gradle/
 **/.kotlin/
 **/build/

@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="dark"><meta name="theme-color" content="#0b1110">
+  <title>PulseStage · Stream Studio</title>
+  <link rel="stylesheet" href="/assets/css/studio.css"><link rel="stylesheet" href="/assets/css/overlay.css">
+  <script type="module" src="/assets/js/studio.js"></script>
+</head>
+<body data-theme="mint">
+  <header class="topbar">
+    <a class="brand" href="/" aria-label="PulseStage beranda"><span class="brand-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 12h4l3-7 4 14 3-7h4"/></svg></span>PulseStage<span class="beta">STUDIO</span></a>
+    <nav aria-label="Navigasi utama"><a class="nav-active" href="/" aria-current="page">Stream studio</a><a href="#quickstart">Panduan OBS</a><a href="/privacy">Privasi ↗</a></nav>
+  </header>
+  <main class="studio">
+    <section class="intro" aria-labelledby="page-title">
+      <div><p class="eyebrow"><span class="status-dot"></span> YOUR PULSE. ON STAGE.</p><h1 id="page-title">Setiap detak,<br><span>bagian dari permainan.</span></h1><p class="intro-copy">Bawa intensitas permainan ke layar. Hubungkan smartwatch<br class="desktop-break"> dan bagikan detak Anda langsung ke stream.</p></div>
+      <div class="signal-route" aria-label="Dari smartwatch ke overlay OBS"><div class="route-node"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="4"/><path d="M9 6V2h6v4M9 18v4h6v-4m-7-6h2l1-3 2 6 1-3h2"/></svg><span>Smartwatch</span></div><span class="route-line" aria-hidden="true"></span><div class="route-core" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 12h4l3-7 4 14 3-7h4"/></svg></div><span class="route-line" aria-hidden="true"></span><div class="route-node"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8m-4-4v4m-3-9 6 3-6 3z"/></svg><span>OBS Studio</span></div></div>
+    </section>
+    <ol class="flow-steps" aria-label="Langkah menyiapkan stream">
+      <li id="step-pair" data-state="current"><span class="step-number">01</span><span>Hubungkan jam</span><span class="step-mark" aria-hidden="true">↗</span></li>
+      <li id="step-obs"><span class="step-number">02</span><span>Siapkan overlay</span><span class="step-mark" aria-hidden="true">↗</span></li>
+      <li id="step-live"><span class="step-number">03</span><span>Mulai sesi</span><span class="step-mark" aria-hidden="true">↗</span></li>
+    </ol>
+    <div class="workspace">
+      <section class="panel setup" aria-labelledby="setup-title">
+        <div class="panel-heading"><span class="eyebrow">YOUR CONNECTION</span><span class="chip"><span class="tiny-dot"></span> Wear OS</span></div>
+        <div class="setup-heading"><div class="watch-glyph" aria-hidden="true"><span><svg viewBox="0 0 24 24"><path d="M3 12h4l3-7 4 14 3-7h4"/></svg></span></div><div><h2 id="setup-title">Mulai dari jam Anda.</h2><p class="muted" id="setup-description">Satu koneksi. Siap untuk setiap momen.</p></div></div>
+        <form id="pair-form">
+          <label for="player-name">Nama di overlay <span>01</span></label><input id="player-name" name="playerName" maxlength="32" placeholder="Nama pemain Anda" autocomplete="nickname" required>
+          <label for="pair-code">Kode pairing <span>02</span></label>
+          <div class="code-field"><input id="pair-code" name="code" maxlength="9" placeholder="ABCD-EFGH" autocomplete="off" autocapitalize="characters" spellcheck="false" required aria-describedby="code-help"><span class="code-lock" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="5" y="10" width="14" height="11" rx="3"/><path d="M8 10V7a4 4 0 0 1 8 0v3m-4 5v2"/></svg></span></div>
+          <p class="hint" id="code-help">Kode ada di aplikasi jam Anda dan berlaku selama 10 menit. Buka tautan dari jam untuk mengisi otomatis.</p>
+          <button class="primary" type="submit"><span>Hubungkan smartwatch</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6"/></svg></button>
+          <p class="consent-note"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 8 3v6c0 5-8 9-8 9s-8-4-8-9V6zm-4 9 3 3 5-6"/></svg>Anda menentukan kapan BPM mulai dibagikan.</p>
+        </form>
+        <div id="connected-panel" hidden>
+          <div class="device"><span class="device-avatar" aria-hidden="true">↗</span><div><strong id="connected-name">Player</strong><p>Smartwatch terhubung</p></div><span class="device-check" aria-label="Terhubung">✓</span></div>
+          <label for="overlay-url">Tautan overlay OBS</label><input id="overlay-url" readonly aria-describedby="link-help">
+          <p class="hint" id="link-help">Salin ke Browser Source OBS. Siapa pun yang memiliki tautan dapat melihat BPM Anda.</p>
+          <button class="primary" id="copy-link" type="button"><span id="copy-label">Salin tautan overlay</span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V4H4v12h4"/></svg></button>
+          <details class="access-settings"><summary>Kelola akses <span aria-hidden="true">+</span></summary><div class="actions"><button class="secondary" id="rotate-link" type="button">Ganti tautan</button><button class="danger" id="delete-device" type="button">Hapus pairing</button></div><p class="hint">Akses tersimpan di browser ini. Jika hilang, reset pairing dari jam.</p></details>
+        </div>
+        <p id="message" class="feedback" role="status" aria-live="polite" hidden></p>
+      </section>
+      <section class="panel preview" aria-labelledby="preview-title">
+        <div class="preview-heading"><div><p class="eyebrow">YOUR BROADCAST</p><h2 id="preview-title">Siap jadi bagian dari stream.</h2></div><span class="connection" id="connection-status" data-state="idle">Belum terhubung</span></div>
+        <div class="preview-stage">
+          <div class="stage-top"><span><span class="tiny-dot"></span> OVERLAY PREVIEW</span><span class="stage-cross" aria-hidden="true">+</span></div><div class="stage-orbit" aria-hidden="true"></div>
+          <div class="preview-card-wrap"><article class="overlay-card" id="preview-card" data-state="idle" aria-label="Preview overlay heart rate">
+            <div class="overlay-topline"><span class="overlay-kicker"><span class="overlay-dot"></span> HEART RATE</span><span class="overlay-state" id="preview-status">MENUNGGU JAM</span></div>
+            <div class="overlay-main"><span class="overlay-heart" aria-hidden="true"><svg viewBox="0 0 32 32"><path d="M16 27S3 19 3 10.5C3 3 12 2 16 8c4-6 13-5 13 2.5C29 19 16 27 16 27Z"/></svg></span><div class="overlay-reading"><strong id="preview-bpm">--</strong><span>BPM</span></div><div class="overlay-player"><span>ON STAGE</span><strong id="preview-name">PLAYER</strong><span class="overlay-brand">PULSESTAGE</span></div></div>
+            <div class="overlay-rail" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+          </article></div>
+          <div class="stage-bottom"><span><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1 1h5v5H1zm9 0h5v5h-5zM1 10h5v5H1zm9 0h5v5h-5z"/></svg> Latar transparan</span><span>480 × 180 PX</span></div>
+        </div>
+        <div class="preview-controls"><div><p class="control-label">Warna aksen</p><div class="theme-options" role="group" aria-label="Warna aksen overlay"><button type="button" class="theme-option" data-theme-choice="mint" aria-pressed="true"><span class="swatch swatch-mint"></span>Mint</button><button type="button" class="theme-option" data-theme-choice="coral" aria-pressed="false"><span class="swatch swatch-coral"></span>Coral</button><button type="button" class="theme-option" data-theme-choice="ice" aria-pressed="false"><span class="swatch swatch-ice"></span>Ice</button></div></div><button id="open-overlay" class="secondary open-overlay" type="button" disabled>Buka overlay <span aria-hidden="true">↗</span></button></div>
+        <p class="preview-note" id="preview-note"><span class="tiny-dot"></span>BPM asli muncul setelah jam terhubung dan sesi dimulai.</p>
+      </section>
+    </div>
+    <section class="quickstart" id="quickstart" aria-labelledby="quickstart-title"><div class="guide-heading"><h2 id="quickstart-title">Dari pergelangan ke layar.</h2><span>SETUP OBS / 3 LANGKAH</span></div><ol class="instructions"><li><span class="guide-number">01</span><div><h3>Tambahkan Browser Source</h3><p>Di OBS, pilih <strong>Sources → + → Browser</strong>.</p></div></li><li><span class="guide-number">02</span><div><h3>Tempel tautan overlay</h3><p>Gunakan ukuran <strong>480 × 180</strong>. Geser ke posisi favorit Anda.</p></div></li><li><span class="guide-number">03</span><div><h3>Tekan Start di jam</h3><p>BPM langsung tampil saat sensor mendapatkan pembacaan.</p></div></li></ol></section>
+    <footer><a class="footer-brand" href="/">PulseStage<span>EVERY BEAT. ON STREAM.</span></a><span>Kontrol di pergelangan Anda. <a href="/privacy">Pelajari privasi ↗</a></span></footer>
+  </main>
+</body>
+</html>

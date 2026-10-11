@@ -18,7 +18,7 @@ Prototipe menggunakan Node.js 24, HTTP bawaan, SQLite, serta SSE satu arah. WebS
 2. Instal Docker dan Compose pada VPS, salin repository, lalu dari root proyek:
 
    ```sh
-   DOMAIN=pulse.domain-anda.com docker compose -f deploy/compose.yaml up -d --build
+   DOMAIN=pulse.domain-anda.com docker compose -f infra/compose.yaml up -d --build
    ```
 
 3. Caddy mengurus HTTPS untuk domain tersebut dan meneruskan SSE tanpa buffering. Node memerlukan `PUBLIC_ORIGIN=https://domain` ketika `NODE_ENV=production`.
@@ -26,6 +26,8 @@ Prototipe menggunakan Node.js 24, HTTP bawaan, SQLite, serta SSE satu arah. WebS
 5. Tentukan pencadangan volume `pulse_data`, pemulihan, monitoring error dan uptime, pembaruan image/dependensi, serta kebijakan penghapusan backup. Log jangan mencatat header Authorization, body BPM, kode pairing, atau path yang mengandung kode akses overlay. Konfigurasi Caddy contoh tidak mengaktifkan access log; jika menambah proxy/CDN/analitik, redaksi atau matikan pencatatan URL rahasia tersebut.
 
 Compose ini adalah konfigurasi awal yang belum diuji deployment dalam sesi pengembangan. Tetapkan versi/digest image yang sudah Anda uji sebelum rilis operasional.
+
+File Compose sekarang berada di `infra/compose.yaml`. Nama project tetap `deploy` untuk mempertahankan volume bawaan dari lokasi lama. Untuk instalasi yang memakai nama project khusus, pertahankan nilai `-p` atau `COMPOSE_PROJECT_NAME` sebelumnya saat menjalankan Compose dari lokasi baru.
 
 ## Batas sebelum membuka layanan ke banyak pengguna
 
@@ -39,7 +41,7 @@ Compose ini adalah konfigurasi awal yang belum diuji deployment dalam sesi penge
 ## Membuat paket rilis
 
 1. Pilih nama aplikasi, `applicationId` permanen, domain produksi, ikon final, dan identitas developer. `dev.pulsestage.wear` adalah nama awal yang harus Anda evaluasi sebelum upload pertama.
-2. Buka `wear/` di Android Studio. Tentukan `backendUrl` menggunakan properti Gradle lokal atau argumen:
+2. Buka `apps/wear/` di Android Studio. Tentukan `backendUrl` menggunakan properti Gradle lokal atau argumen:
 
    ```sh
    ./gradlew bundleRelease -PbackendUrl=https://pulse.domain-anda.com

@@ -1,5 +1,5 @@
 // Synthetic data for development only. A real watch uses the same API contract.
-import { pairingPath } from '../web/links.js';
+import { pairingPath } from '../packages/protocol/src/links.js';
 const origin = process.env.SERVER_URL || 'http://127.0.0.1:3000';
 let ingestToken;
 let sessionId;

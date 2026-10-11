@@ -5,9 +5,11 @@
   "type": "module",
   "engines": { "node": ">=24.0.0" },
   "scripts": {
-    "start": "node server/main.mjs",
-    "dev": "node --watch server/main.mjs",
-    "test": "node --test --test-isolation=none tests/*.test.mjs",
+    "start": "node apps/server/src/main.mjs",
+    "dev": "node --watch apps/server/src/main.mjs",
+    "test": "node --test --test-isolation=none apps/server/tests/*.test.mjs packages/protocol/tests/*.test.mjs",
+    "test:server": "node --test --test-isolation=none apps/server/tests/*.test.mjs",
+    "test:protocol": "node --test --test-isolation=none packages/protocol/tests/*.test.mjs",
     "demo": "node scripts/simulate-watch.mjs"
   }
 }

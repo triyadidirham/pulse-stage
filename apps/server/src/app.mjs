@@ -5,7 +5,6 @@ import { body, fail, json } from './http/json.mjs';
 import { serveStatic } from './http/static.mjs';
 import { code, hash, token } from './security/credentials.mjs';
 
-const PAIR_TTL = 10 * 60_000;
 const STALE_MS = 15_000;
 
 export function createApp({ databasePath = ':memory:', publicOrigin = '', now = Date.now, production = false } = {}) {
@@ -60,9 +59,8 @@ export function createApp({ databasePath = ':memory:', publicOrigin = '', now = 
   function newPair(id) {
     let pairingCode;
     do { pairingCode = code(); } while (devices.hasPairingCode(hash(pairingCode)));
-    const expiresAt = now() + PAIR_TTL;
-    devices.renewPairing(id, hash(pairingCode), expiresAt);
-    return { pairingCode, expiresAt };
+    devices.resetPairing(id, hash(pairingCode));
+    return { pairingCode, expiresAt: null };
   }
   const server = createServer(async (req, res) => {
     res.setHeader('Cache-Control', 'no-store');
@@ -97,21 +95,23 @@ export function createApp({ databasePath = ':memory:', publicOrigin = '', now = 
         const overlayToken = token();
         const device = devices.claimPairing({
           codeHash: hash(normalized), manageHash: hash(manageToken), overlayHash: hash(overlayToken),
-          playerName: name, now: now(),
+          playerName: name,
         });
-        if (!device) throw fail(400, 'Kode tidak berlaku, kedaluwarsa, atau sudah dipakai.');
-        return json(res, 200, { deviceId: device.id, manageToken, overlayToken, playerName: name });
+        if (!device) throw fail(400, 'Kode tidak valid atau sudah direset dari jam.');
+        return json(res, 200, { deviceId: device.id, manageToken, overlayToken, playerName: device.player_name });
       }
       if (path.startsWith('/api/device/')) {
         const device = authenticate(req, 'ingest');
         limit(`device:${device.id}`, 240);
         if (method === 'GET' && path === '/api/device/status') {
-          return json(res, 200, { paired: Boolean(device.manage_hash), playerName: device.player_name });
+          return json(res, 200, { paired: Boolean(device.paired), playerName: device.player_name, pairingAvailable: Boolean(device.pair_hash) });
         }
         if (method === 'POST' && path === '/api/device/pairing') {
-          if (device.manage_hash) throw fail(409, 'Jam sudah terhubung. Hapus pairing untuk menghubungkan ulang.');
           limit(`new-pair:${device.id}`, 5);
-          return json(res, 200, newPair(device.id));
+          const pairing = newPair(device.id);
+          revokeStreams(device.id);
+          live.delete(device.id);
+          return json(res, 200, pairing);
         }
         if (method === 'DELETE' && path === '/api/device/registration') {
           revokeStreams(device.id);
@@ -119,7 +119,7 @@ export function createApp({ databasePath = ':memory:', publicOrigin = '', now = 
           devices.delete(device.id);
           return json(res, 200, { deleted: true });
         }
-        if (!device.manage_hash) throw fail(409, 'Hubungkan jam di web terlebih dahulu.');
+        if (!device.paired) throw fail(409, 'Hubungkan jam di web terlebih dahulu.');
         if (method === 'POST' && path === '/api/device/session') {
           const data = await body(req);
           if (typeof data.active !== 'boolean') throw fail(400, 'active harus boolean.');
@@ -190,15 +190,17 @@ export function createApp({ databasePath = ':memory:', publicOrigin = '', now = 
   const timer = setInterval(() => {
     for (const id of listeners.keys()) broadcast(id);
     for (const [key, value] of limits) if (value.until <= now()) limits.delete(key);
-    devices.pruneUnpaired(now() - 24 * 60 * 60_000);
     for (const [id, session] of live) {
       if (session.sample && now() - session.sample.receivedAt > 60_000) session.sample = null;
     }
   }, 5_000);
   timer.unref();
+  let closed = false;
   return {
     server,
     close: async () => {
+      if (closed) return;
+      closed = true;
       clearInterval(timer);
       // Shutdown is temporary, not an authorization revocation: clients must reconnect.
       for (const set of listeners.values()) for (const res of set) res.end();

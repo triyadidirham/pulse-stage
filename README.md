@@ -2,13 +2,13 @@
 
 Aplikasi **Wear OS + server Node.js + overlay web untuk OBS**. Ditujukan untuk Xiaomi Watch 2 Pro dan perangkat Wear OS dengan sensor heart rate. Folder repository memakai nama `sensor-stream-watchos`, tetapi aplikasi ini untuk **Wear OS Android**, bukan Apple watchOS.
 
-Status: prototipe fungsional untuk pengujian. Belum dipublikasikan ke Play Store atau di-deploy ke domain publik; pembacaan sensor dan ketahanan baterai belum diuji pada jam fisik.
+Status: prototipe untuk pengujian. Belum dipublikasikan ke Play Store; jalur Health Services dan ketahanan baterai masih perlu diverifikasi pada jam fisik.
 
 ## Tampilan studio dan jam
 
 - Dashboard gelap dengan aksen mint, panduan pairing, indikator koneksi, dan preview overlay yang memakai komponen visual yang sama dengan Browser Source OBS.
 - Pilihan warna **Mint**, **Coral**, dan **Ice**. Pilih warna sebelum menyalin tautan; perubahan warna menghasilkan URL baru untuk ditempel ke OBS tanpa mengganti kode akses perangkat.
-- Wear OS memakai dial BPM besar, tombol Start/Stop, kartu kode pairing dengan hitung mundur, dan kontrol yang dapat digulir melalui layar sentuh atau crown. Data tidak ditampilkan sebagai LIVE sebelum pengiriman berhasil.
+- Wear OS memakai dial BPM besar, tombol Start/Stop, kartu kode pairing yang berlaku sampai direset, dan kontrol yang dapat digulir melalui layar sentuh atau crown. Data tidak ditampilkan sebagai LIVE sebelum pengiriman berhasil.
 - Preview tidak memakai angka demo. Pembacaan yang kedaluwarsa atau koneksi terputus ditampilkan sebagai `--`. Animasi dekoratif pada web mengikuti preferensi reduced motion; dial jam hanya digambar ulang saat nilai/status berubah.
 
 ## Alur pengguna
@@ -18,9 +18,9 @@ Status: prototipe fungsional untuk pengujian. Belum dipublikasikan ke Play Store
 3. Web menghasilkan tautan overlay pribadi berbentuk `https://domain/kode-akses-overlay` untuk Browser Source OBS.
 4. Setelah membaca penjelasan pembagian data dan memberi izin sensor, pengguna menekan **Start** di jam.
 5. Jam mengirim pembacaan BPM melalui HTTPS ke server. Server meneruskannya ke web/OBS melalui **Server-Sent Events (SSE)**.
-6. **Stop** menghentikan sensor dan pengiriman; **Hapus pairing / Reset pairing** mencabut akses perangkat dan overlay.
+6. **Stop** menghentikan sensor dan pengiriman; **Reset kode akses** di jam mengganti kode sekaligus mencabut semua akses browser/OBS lama; **Hapus pairing** di web atau **Hapus koneksi** di jam menghapus registrasi.
 
-Kode di layar jam adalah kode **sekali pakai, berlaku 10 menit**, bukan ID permanen untuk membaca data seseorang. Kredensial jam, pengelola, dan overlay memiliki hak berbeda. Tidak ada aplikasi HP pendamping yang wajib dipasang.
+Kode di layar jam **tidak kedaluwarsa dan dapat dipakai ulang**, termasuk untuk menghubungkan browser baru. Simpan kode seperti kata sandi: pemiliknya dapat mengelola perangkat dan membuat tautan OBS. Kredensial jam, pengelola, dan overlay memiliki hak berbeda. Tidak ada aplikasi HP pendamping yang wajib dipasang.
 
 ## Menjalankan server
 
@@ -55,7 +55,7 @@ Biarkan server berjalan, lalu pada terminal lain:
 npm run demo
 ```
 
-Simulator mencetak tautan pairing. Buka tautan dan masukkan nama **DEMO** agar data sintetis jelas dibedakan dari data sensor. Setelah pairing, angka simulasi akan muncul di preview dan overlay. Ctrl+C menghapus registrasi simulator. Kode akan kedaluwarsa jika tidak diklaim dalam 10 menit.
+Simulator mencetak tautan pairing. Buka tautan dan masukkan nama **DEMO** agar data sintetis jelas dibedakan dari data sensor. Setelah pairing, angka simulasi akan muncul di preview dan overlay. Ctrl+C menghapus registrasi simulator. Kode tidak kedaluwarsa; penghapusan registrasi simulator mencabut kode tersebut.
 
 ## Aplikasi Wear OS
 
@@ -87,31 +87,31 @@ Pada jam:
 3. Tekan **Start**, baca penjelasan pembagian data, dan berikan izin sensor.
 4. Tekan **Stop** ketika selesai. Batas sesi prototipe adalah 4 jam; mulai sesi baru setelahnya jika diperlukan.
 
-Pemilihan server hanya tersedia di build debug. Pada rilis Play Store, alamat server tertanam saat build; pengguna cukup membuka tautan yang ditampilkan. Tidak perlu mengatur environment di jam. Reset pairing diperlukan sebelum mengganti server pada debug agar kredensial server lama tidak terkirim ke server lain.
+Pemilihan server hanya tersedia di build debug. Pada rilis Play Store, alamat server tertanam saat build; pengguna cukup membuka tautan yang ditampilkan. Tidak perlu mengatur environment di jam. Hapus koneksi diperlukan sebelum mengganti server pada debug agar kredensial server lama tidak terkirim ke server lain.
 
 ### Jika jam terus menunggu sensor
 
 Pada Android API 34, izin yang diperlukan adalah **Sensor tubuh** (`BODY_SENSORS`). Pastikan izin diberikan pada aplikasi PulseStage yang sedang dibuka; paket debug (`dev.pulsestage.wear.debug`) berbeda dari release (`dev.pulsestage.wear`). Gunakan aplikasi detak jantung bawaan sebagai pembanding, kemudian hentikan pengukurannya sebelum mencoba PulseStage.
 
-Aplikasi mencoba sensor heart rate wake-up terlebih dahulu jika tersedia, lalu sensor alternatif pada perangkat. Setelah 45 detik tanpa pembacaan valid, listener didaftarkan ulang, maksimal dua kali berturut-turut. Jika tetap tidak mendapat data, sesi dihentikan dengan pesan penyebab. Start memulai percobaan baru. Pembacaan lama, timestamp tidak valid, `NO_CONTACT`, dan `UNRELIABLE` tidak dikirim sebagai BPM. Keberhasilan pengecekan server tidak menghapus pesan masalah sensor.
+Aplikasi memakai **Health Services `ExerciseClient`**, jenis sesi `WORKOUT`, hanya meminta `HEART_RATE_BPM`, tanpa GPS atau auto-pause. Jalur ini menggantikan pembacaan langsung SensorManager/LifeQ yang pada pengujian Xiaomi berhasil didaftarkan tetapi tidak memberikan BPM valid. Sesi aktivitas aplikasi lain harus dihentikan dahulu; PulseStage memeriksa kepemilikan sebelum Start. Sesi Wear OS tetap diakhiri jika Stop ditekan saat proses Start masih berjalan.
 
-Untuk menelusuri masalah pada perangkat, jalankan log berikut **sebelum menekan Start** dan tunggu sampai pembacaan masuk atau sesi berhenti:
+Perbarui Health Services dari Play Store jam dan gunakan APK terbaru. Saat layar mati, pengiriman sensor dapat dibatch oleh Wear OS. PulseStage meminta batching HR 5 detik jika perangkat mendukungnya; data dengan umur lebih dari 15 detik tetap disembunyikan. Setelah 135 detik tanpa BPM valid, sesi dihentikan dengan pesan diagnosis. Timestamp pengukuran asli dipakai, dan status `NO_CONTACT`/`UNRELIABLE` tidak diterbitkan sebagai BPM.
 
-```sh
+```bash
 adb shell getprop ro.build.version.sdk
-adb shell dumpsys package dev.pulsestage.wear.debug | grep -E 'BODY_SENSORS|FOREGROUND_SERVICE_HEALTH'
-adb logcat -v time PulseStageSensor:I AndroidRuntime:E '*:S'
+adb logcat -c
+adb logcat -v time PulseStageSensor:I PulseStageHealth:I AndroidRuntime:E '*:S'
 ```
 
-Ganti nama paket jika memakai release. Log `PulseStageSensor` mencatat registrasi, jenis sensor, status kualitas, dan percobaan ulang, tanpa nilai BPM maupun token. Gunakan build terbaru agar tag ini tersedia. Log kosong dari `SensorService`/`SensorManager` pada firmware tertentu belum membuktikan sensor bekerja atau gagal. Kecocokan dengan firmware Xiaomi Watch 2 Pro tetap perlu diuji pada jam fisik.
+Tekan Start setelah logcat berjalan. `PulseStageHealth` mencatat kemampuan perangkat, kepemilikan, registrasi callback, dan status sesi; `PulseStageSensor` mencatat status pembacaan/pengiriman. Log aplikasi tidak berisi BPM atau kredensial. Keberhasilan membaca BPM dan perilaku saat layar mati tetap perlu diuji pada Xiaomi Watch 2 Pro fisik.
 
-Jalankan pengujian validasi pembacaan dengan `./gradlew testDebugUnitTest` dari `apps/wear/`. Aturan status/accuracy mengikuti [dokumentasi sensor heart rate Android](https://developer.android.com/reference/android/hardware/Sensor#TYPE_HEART_RATE).
+```bash
+cd apps/wear
+./gradlew testDebugUnitTest assembleDebug -PbackendUrl=https://ps.triyadi.dev
+adb install -r app/build/outputs/apk/debug/app-debug.apk
+```
 
-### Artefak uji dari sesi pengembangan ini
-
-`apps/wear/app/build/outputs/apk/debug/pulsestage-ui-debug.apk`, bila tersedia, adalah APK dengan tampilan terbaru yang dikompilasi langsung memakai Kotlin compiler, AAPT2, D8, zipalign, dan apksigner lokal. APK ini memakai kunci debug Android lokal dan server uji `http://192.168.10.6:3000`. Gunakan nama file itu pada perintah `adb install` di atas. Ini bukan paket distribusi produksi dan belum diuji di jam fisik; build Gradle standar tetap perlu diverifikasi pada mesin tanpa pembatasan filesystem/socket.
-
-`apps/wear/app/build/outputs/apk/debug/pulsestage-sensor-debug.apk`, bila tersedia, menyertakan pemulihan/diagnostik sensor dan URL bawaan `https://ps.triyadi.dev`. Paket ini juga dikompilasi menggunakan tool SDK lokal dan ditandatangani dengan kunci debug, serta belum diverifikasi pada jam fisik. Pengaturan server yang sudah tersimpan di jam tetap memiliki prioritas.
+Dependensi `com.google.guava:listenablefuture:1.0` dideklarasikan eksplisit karena API Health Services memakainya pada tipe hasil asynchronous. Lihat [panduan ExerciseClient](https://developer.android.com/health-and-fitness/health-services/active-data). APK debug hasil percobaan lama bukan build Health Services terbaru; gunakan output Gradle di atas.
 
 ## OBS
 
@@ -119,13 +119,15 @@ Setelah pairing, pilih **Salin tautan overlay** pada dashboard. Tambahkan **Sour
 
 Warna Coral dan Ice ditambahkan sebagai `?theme=coral` atau `?theme=ice` pada URL; tanpa parameter, warna default adalah Mint. Pilihan warna tersimpan di browser dashboard. Jika Anda mengganti warna setelah setup OBS, salin ulang URL ke Browser Source. Tombol **Buka overlay** membuka tampilan transparan di tab baru.
 
-URL pendek delapan karakter di jam digunakan untuk pairing sekali pakai. URL OBS memakai kode akses acak yang lebih panjang dan tetap berlaku sampai Anda mengganti tautan atau menghapus pairing. Membuka halaman pairing saja tidak mengklaim jam; pengguna tetap menekan **Hubungkan jam**. Ketika URL pairing dibuka pada browser yang sudah mengelola jam lain, penggantian perangkat aktif harus dikonfirmasi sebelum klaim.
+URL pendek delapan karakter di jam dapat digunakan untuk pairing berulang kali sampai kode direset. Pairing ulang membuat akses browser baru tanpa memutus tautan OBS yang sudah terpasang. URL OBS memakai kode akses acak yang lebih panjang dan tetap berlaku sampai Anda mengganti tautan atau menghapus pairing. Membuka halaman pairing saja tidak mengklaim jam; pengguna tetap menekan **Hubungkan jam**. Ketika URL pairing dibuka pada browser yang sudah mengelola jam lain, penggantian perangkat aktif harus dikonfirmasi sebelum klaim.
 
-Browser dashboard menyimpan akses pengelola dan URL overlay di localStorage. Prototipe belum memiliki akun/login atau pemulihan lintas browser. Jika data browser hilang, gunakan **Reset pairing** pada jam, lalu pairing ulang. Gunakan **Ganti tautan** untuk mencabut URL OBS lama tanpa mengganti kredensial jam.
+Browser dashboard menyimpan akses pengelola dan URL overlay di localStorage. Prototipe belum memiliki akun/login. Jika data browser hilang, masukkan kembali kode yang sama dari jam. Gunakan **Ganti tautan OBS** untuk mencabut seluruh URL OBS lama tanpa mengganti kode pairing atau kredensial jam. Jika kode pairing bocor, tekan **Reset kode akses** di jam; semua akses browser/OBS lama ikut dicabut. Kode tetap berlaku setelah restart server selama database disimpan.
+
+Upgrade: cadangkan database, deploy server baru, lalu pasang APK terbaru. Migrasi mempertahankan akses browser/OBS lama. Untuk pairing yang sudah dikonsumsi versi sebelumnya, tekan **Reset kode akses** sekali di jam untuk membuat kode permanen dan hubungkan ulang OBS. Kode pending lama otomatis menjadi tanpa kedaluwarsa. Detail kompatibilitas/rollback tersedia di [kontrak API](docs/api.md#reset-dan-migrasi).
 
 ## Perilaku pembacaan
 
-- `SensorManager.TYPE_HEART_RATE` dibaca dalam foreground service yang dimulai dari tombol Start saat activity terlihat. Tidak ada pelacakan otomatis ketika aplikasi dibuka atau perangkat menyala.
+- `Health Services ExerciseClient` dijalankan dalam foreground service yang dimulai dari tombol Start saat activity terlihat. Tidak ada pelacakan otomatis ketika aplikasi dibuka atau perangkat menyala.
 - Izin `BODY_SENSORS` digunakan hingga API 35; `READ_HEART_RATE` digunakan pada API 36+. Tidak meminta izin background sensor terpisah atau akses Health Connect.
 - Wake lock hanya dipegang selama sesi aktif, maksimal 4 jam. Konsumsi baterai dan perilaku sensor saat layar mati perlu diuji pada firmware Xiaomi yang sebenarnya.
 - Jam mengirim pembacaan terbaru, maksimal sekitar sekali per detik, sesuai ketersediaan sensor. Tidak ada jaminan bahwa sensor menghasilkan pembacaan baru setiap detik.
@@ -142,7 +144,7 @@ npm test
 RUN_HTTP_TESTS=1 npm test
 ```
 
-Tes default menggunakan handler HTTP yang sebenarnya dengan request/response stream dalam proses, tanpa membuka port. Meliputi alur pairing, pemisahan hak kredensial, pengiriman melalui SSE, kedaluwarsa, Stop, rotasi URL, penghapusan, validasi input, pembatasan percobaan, persistensi database tanpa riwayat BPM, lokasi database, serta pemuatan aset dan modul browser dari struktur baru.
+Tes default menggunakan handler HTTP yang sebenarnya dengan request/response stream dalam proses, tanpa membuka port. Meliputi pairing permanen, reset/revokasi semua akses, migrasi database lama, pemisahan hak kredensial, pengiriman melalui SSE, kedaluwarsa, Stop, rotasi URL, penghapusan, validasi input, pembatasan percobaan, persistensi database tanpa riwayat BPM, lokasi database, serta pemuatan aset dan modul browser dari struktur baru.
 
 Di lingkungan pembuatan ini, socket lokal diblokir (`EPERM`), sehingga preview browser, transport HTTP nyata, dan Gradle daemon tidak dapat dijalankan. Kompilasi langsung Kotlin/resource Android serta verifikasi tanda tangan APK tidak menggantikan pengujian jam/OBS sebenarnya.
 

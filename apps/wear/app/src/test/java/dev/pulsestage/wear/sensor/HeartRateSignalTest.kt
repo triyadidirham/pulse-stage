@@ -89,4 +89,24 @@ class HeartRateSignalTest {
         assertTrue(signal.needsRetry(145_000))
         assertEquals(HeartRateSignal.Issue.UNRELIABLE.message, signal.message(145_000))
     }
+    @Test fun optionalHealthServicesAccuracyDoesNotDiscardFreshMeasurements() {
+        val signal = signal()
+        val reading = signal.accept(78.0, HeartRateSignal.Quality.UNSPECIFIED, nanos(101_000), nanos(105_000))!!
+        assertEquals(101_000L, reading.elapsedMs)
+        assertEquals(78f, reading.bpm, 0f)
+        assertNull(signal.accept(80.0, HeartRateSignal.Quality.UNRELIABLE, nanos(106_000), nanos(106_000)))
+        assertNull(signal.reading)
+        assertNull(signal.accept(80.0, HeartRateSignal.Quality.NO_CONTACT, nanos(107_000), nanos(107_000)))
+        assertNull(signal.reading)
+    }
+
+    @Test fun batchKeepsOnlyFreshMeasurementsAndExpiresFromMeasurementTime() {
+        val signal = signal()
+        val accepted = listOf(80_000L, 90_000L, 101_000L, 109_000L).mapNotNull {
+            signal.accept(80.0, HeartRateSignal.Quality.UNSPECIFIED, nanos(it), nanos(110_000))
+        }
+        assertEquals(listOf(101_000L, 109_000L), accepted.map { it.elapsedMs })
+        assertEquals(109_000L, signal.reading!!.elapsedMs)
+        assertFalse(signal.isFresh(124_001))
+    }
 }

@@ -30,16 +30,16 @@
           <label for="player-name">Nama di overlay <span>01</span></label><input id="player-name" name="playerName" maxlength="32" placeholder="Nama pemain Anda" autocomplete="nickname" required>
           <label for="pair-code">Kode pairing <span>02</span></label>
           <div class="code-field"><input id="pair-code" name="code" maxlength="9" placeholder="ABCD-EFGH" autocomplete="off" autocapitalize="characters" spellcheck="false" required aria-describedby="code-help"><span class="code-lock" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="5" y="10" width="14" height="11" rx="3"/><path d="M8 10V7a4 4 0 0 1 8 0v3m-4 5v2"/></svg></span></div>
-          <p class="hint" id="code-help">Kode ada di aplikasi jam Anda dan berlaku selama 10 menit. Buka tautan dari jam untuk mengisi otomatis.</p>
+          <p class="hint" id="code-help">Kode di jam dapat dipakai berulang kali dan berlaku sampai direset. Buka tautan dari jam untuk mengisi otomatis. Simpan kode ini seperti kata sandi.</p>
           <button class="primary" type="submit"><span>Hubungkan smartwatch</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6"/></svg></button>
           <p class="consent-note"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 8 3v6c0 5-8 9-8 9s-8-4-8-9V6zm-4 9 3 3 5-6"/></svg>Anda menentukan kapan BPM mulai dibagikan.</p>
         </form>
         <div id="connected-panel" hidden>
           <div class="device"><span class="device-avatar" aria-hidden="true">↗</span><div><strong id="connected-name">Player</strong><p>Smartwatch terhubung</p></div><span class="device-check" aria-label="Terhubung">✓</span></div>
           <label for="overlay-url">Tautan overlay OBS</label><input id="overlay-url" readonly aria-describedby="link-help">
-          <p class="hint" id="link-help">Salin ke Browser Source OBS. Siapa pun yang memiliki tautan dapat melihat BPM Anda.</p>
+          <p class="hint" id="link-help">Tautan tetap berlaku sampai diganti atau akses direset. Salin ke Browser Source OBS; siapa pun yang memiliki tautan dapat melihat BPM Anda.</p>
           <button class="primary" id="copy-link" type="button"><span id="copy-label">Salin tautan overlay</span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V4H4v12h4"/></svg></button>
-          <details class="access-settings"><summary>Kelola akses <span aria-hidden="true">+</span></summary><div class="actions"><button class="secondary" id="rotate-link" type="button">Ganti tautan</button><button class="danger" id="delete-device" type="button">Hapus pairing</button></div><p class="hint">Akses tersimpan di browser ini. Jika hilang, reset pairing dari jam.</p></details>
+          <details class="access-settings"><summary>Kelola akses <span aria-hidden="true">+</span></summary><div class="actions"><button class="secondary" id="rotate-link" type="button">Ganti tautan OBS</button><button class="danger" id="delete-device" type="button">Hapus pairing</button></div><p class="hint">Akses browser hilang? Masukkan kembali kode yang sama dari jam. Kode pairing bocor? Tekan Reset kode akses di jam untuk mencabut kode, semua akses browser, dan tautan OBS lama.</p></details>
         </div>
         <p id="message" class="feedback" role="status" aria-live="polite" hidden></p>
       </section>

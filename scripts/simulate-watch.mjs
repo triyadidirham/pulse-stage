@@ -17,7 +17,6 @@ async function api(path, method = 'GET', body) {
 const registration = await api('/api/devices', 'POST');
 ingestToken = registration.ingestToken;
 console.log(`SIMULASI — bukan data sensor. Buka ${origin}${pairingPath(registration.pairingCode)}, lalu masukkan nama pemain "DEMO".`);
-const until = registration.expiresAt;
 process.once('SIGINT', stop);
 process.once('SIGTERM', stop);
 while (!stopping) {
@@ -25,7 +24,6 @@ while (!stopping) {
     if (!sessionId) {
       const state = await api('/api/device/status');
       if (state.paired) sessionId = (await api('/api/device/session', 'POST', { active: true })).sessionId;
-      else if (Date.now() >= until) throw new Error('Kode kedaluwarsa. Jalankan ulang simulator.');
     }
     if (sessionId) await api('/api/device/samples', 'POST', { sessionId, sequence: sequence++, bpm: Math.round(85 + 12 * Math.sin(Date.now() / 5000)), measuredAt: Date.now() });
   } catch (error) { console.error(error.message); break; }

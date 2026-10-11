@@ -15,7 +15,6 @@ class Api(context: Context) {
     val origin: String get() = if (BuildConfig.DEBUG) preferences.getString("origin", BuildConfig.BACKEND_URL)!! else BuildConfig.BACKEND_URL
     val ingestToken: String get() = preferences.getString("ingestToken", "")!!
     val pairingCode: String get() = preferences.getString("pairingCode", "")!!
-    val expiresAt: Long get() = preferences.getLong("expiresAt", 0)
 
     fun setOrigin(value: String) {
         val uri = URI(value.trim().trimEnd('/'))
@@ -53,9 +52,9 @@ class Api(context: Context) {
         return result
     }
 
-    fun renewPairing() { savePairing(request("/api/device/pairing", "POST")) }
+    fun resetPairing() { savePairing(request("/api/device/pairing", "POST")) }
     private fun savePairing(data: JSONObject) {
-        preferences.edit().putString("pairingCode", data.getString("pairingCode")).putLong("expiresAt", data.getLong("expiresAt")).apply()
+        preferences.edit().putString("pairingCode", data.getString("pairingCode")).remove("expiresAt").apply()
     }
     fun clearRegistration() { preferences.edit().remove("ingestToken").remove("deviceId").remove("pairingCode").remove("expiresAt").apply() }
 }

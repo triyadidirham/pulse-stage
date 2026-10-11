@@ -8,6 +8,8 @@ internal class HeartRateSignal {
     }
 
     data class Reading(val bpm: Float, val elapsedMs: Long)
+    // Missing Health Services accuracy is different from SensorManager's UNRELIABLE (0).
+    enum class Quality { RELIABLE, UNSPECIFIED, NO_CONTACT, UNRELIABLE }
     enum class Issue(val message: String) {
         WAITING("Menunggu pembacaan pertama… Pakai jam dengan pas."),
         NO_CONTACT("Sensor belum menyentuh kulit. Sesuaikan posisi jam."),
@@ -41,8 +43,23 @@ internal class HeartRateSignal {
     }
 
     fun accept(value: Float?, accuracy: Int, timestampNanos: Long, nowNanos: Long): Reading? {
-        if (accuracy <= 0) { updateAccuracy(accuracy); return null }
-        if (value == null || !value.isFinite() || value !in 20f..300f) {
+        val quality = when {
+            accuracy == -1 -> Quality.NO_CONTACT
+            accuracy <= 0 -> Quality.UNRELIABLE
+            else -> Quality.RELIABLE
+        }
+        return accept(value?.toDouble(), quality, timestampNanos, nowNanos)
+    }
+
+    fun clear() { reading = null; issue = Issue.WAITING }
+
+    fun accept(value: Double?, quality: Quality, timestampNanos: Long, nowNanos: Long): Reading? {
+        when (quality) {
+            Quality.NO_CONTACT -> { updateAccuracy(-1); return null }
+            Quality.UNRELIABLE -> { updateAccuracy(0); return null }
+            else -> Unit
+        }
+        if (value == null || !value.isFinite() || value !in 20.0..300.0) {
             reading = null
             issue = Issue.INVALID_VALUE
             return null
@@ -60,7 +77,7 @@ internal class HeartRateSignal {
         }
         lastAcceptedNanos = timestampNanos
         lastAcceptedAtMs = nowNanos / 1_000_000
-        return Reading(value, timestampNanos / 1_000_000).also { reading = it }
+        return Reading(value.toFloat(), timestampNanos / 1_000_000).also { reading = it }
     }
 
     fun isFresh(nowMs: Long): Boolean = reading?.let { nowMs - it.elapsedMs in 0..FRESH_MS } == true

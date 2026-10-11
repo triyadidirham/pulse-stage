@@ -93,7 +93,7 @@ function render() {
 }
 $('pair-form').addEventListener('submit', async event => {
   event.preventDefault();
-  if (incomingCode && saved && !confirm(`Hubungkan kode baru dan ganti perangkat aktif ${saved.playerName} di browser ini? Jam sebelumnya tetap terdaftar dan bisa di-reset dari jam tersebut.`)) return;
+  if (incomingCode && saved && !confirm(`Hubungkan kode baru dan ganti perangkat aktif ${saved.playerName} di browser ini? Akses dan tautan OBS sebelumnya tetap berlaku.`)) return;
   const button = event.submitter || $('pair-form').querySelector('button[type="submit"]');
   button.disabled = true;
   $('pair-form').setAttribute('aria-busy', 'true');
@@ -131,7 +131,7 @@ document.querySelectorAll('[data-theme-choice]').forEach(button => {
   });
 });
 $('rotate-link').addEventListener('click', async () => {
-  if (!confirm('Tautan overlay lama akan berhenti berfungsi. Buat tautan baru?')) return;
+  if (!confirm('Semua tautan OBS lama untuk jam ini akan dicabut, termasuk dari browser lain. Kode pairing tetap berlaku. Buat tautan baru?')) return;
   $('rotate-link').disabled = true;
   try { Object.assign(saved, await api('/api/manage/rotate-overlay', { method: 'POST' })); overlayPrepared = false; persist(); render(); message('Tautan diganti. Perbarui URL di OBS.'); }
   catch (error) { message(error.message, true); }

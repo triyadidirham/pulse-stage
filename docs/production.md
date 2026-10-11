@@ -197,7 +197,7 @@ Aplikasi membaca data heart rate walaupun digunakan untuk overlay gaming. Jelask
 - Lengkapi **Health apps declaration**, **Data safety**, dan deklarasi foreground service bila diminta Play Console, sesuai perilaku aplikasi dan infrastruktur sebenarnya. Heart rate dan pengenal perangkat dikirim ke server; jangan mengklaim aplikasi tidak mengirim data.
 - Ganti halaman `/privacy` pengembangan dengan kebijakan final yang memuat identitas operator, kontak, data yang dikumpulkan, tujuan, penerima, retensi, log/backup, cara mencabut consent dan menghapus data. Tampilkan link tersebut pada aplikasi dan listing.
 - Dialog sebelum Start sudah menjelaskan pengiriman BPM dan akses penonton. Pastikan izin runtime diberikan setelah penjelasan, dan Stop tetap mudah diakses dari jam/notifikasi. Tidak ada startup otomatis atau pengambilan data sebelum persetujuan sesi.
-- Gunakan izin paling sempit. Manifest menyediakan `BODY_SENSORS` hingga API 35 dan `READ_HEART_RATE` untuk API 36+. Aplikasi memulai health foreground service dari activity yang terlihat. Tidak menggunakan Health Connect, bukan pencatatan workout, dan tidak menyamarkan sesi gaming sebagai olahraga.
+- Gunakan izin paling sempit. Manifest menyediakan `BODY_SENSORS` hingga API 35 dan `READ_HEART_RATE` untuk API 36+. Aplikasi memulai health foreground service dari activity yang terlihat. Tidak menggunakan Health Connect. Health Services memakai sesi `WORKOUT` umum untuk membaca BPM; jelaskan penggunaan sesi aktivitas ini pada consent dan deklarasi Play. Aplikasi tidak meminta GPS atau menyimpan riwayat olahraga.
 - Jika kelak menambah akun, analitik, penyimpanan riwayat, iklan, billing, atau layanan pihak ketiga, perbarui deklarasi, consent, retensi, dan alur penghapusan sesuai fitur yang benar-benar diimplementasikan.
 
 Referensi resmi:
@@ -212,4 +212,11 @@ Referensi resmi:
 
 ## Pemeriksaan penerimaan sebelum rilis
 
-Pairing hanya berhasil sekali; kode kedaluwarsa ditolak; perangkat A tidak dapat mengirim data milik B; token overlay tidak dapat menulis data; pergantian URL memutus subscriber lama; Stop meniadakan BPM; sample lama tidak tampil ulang setelah reconnect; tidak ada riwayat BPM atau token mentah dalam database/log; reset dari jam dan hapus dari web sama-sama mencabut registrasi; build release tidak mengizinkan HTTP; dashboard/overlay dan antarmuka jam dapat dipakai pada ukuran layar sebenarnya.
+Kode pairing dapat dipakai berulang kali tanpa kedaluwarsa; reset menolak kode dan seluruh akses lama; perangkat A tidak dapat mengirim data milik B; token overlay tidak dapat menulis data; pergantian URL memutus subscriber lama; Stop meniadakan BPM; sample lama tidak tampil ulang setelah reconnect; tidak ada riwayat BPM atau token mentah dalam database/log; reset kode dari jam mencabut seluruh akses browser/OBS, sedangkan Hapus koneksi di jam atau Hapus pairing di web menghapus registrasi; build release tidak mengizinkan HTTP; dashboard/overlay dan antarmuka jam dapat dipakai pada ukuran layar sebenarnya.
+
+
+### Upgrade kode permanen dan Health Services (v0.1.1)
+
+Cadangkan database SQLite beserta WAL secara konsisten sebelum upgrade. Deploy image backend/web terbaru tanpa menghapus volume data, lalu build/install APK baru. Schema kredensial dimigrasikan otomatis; akses browser dan OBS yang sudah ada tetap berlaku. Kode yang belum diklaim menjadi tanpa kedaluwarsa. Jika kode lama sudah dikonsumsi, gunakan Reset kode akses dari APK baru dan pairing ulang; langkah ini juga mencabut URL OBS lama. Jangan rollback backend lama dengan database yang sudah dimigrasikan: pulihkan backup versi sebelumnya terlebih dahulu.
+
+Uji Start/Stop pada jam, termasuk layar mati dan Stop ketika Health Services masih memulai sesi. Tutup sesi olahraga aplikasi lain sebelum Start. Lihat log `PulseStageSensor` dan `PulseStageHealth` serta petunjuk build di README. APK lama tidak mendukung respons pairing `expiresAt:null`.

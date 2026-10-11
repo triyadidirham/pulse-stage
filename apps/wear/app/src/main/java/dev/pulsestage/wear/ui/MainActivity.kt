@@ -43,6 +43,7 @@ class MainActivity : Activity() {
     private lateinit var start: Button
     private lateinit var register: Button
     private lateinit var reset: Button
+    private lateinit var disconnect: Button
     private lateinit var scroll: ScrollView
     private var serverButton: Button? = null
     private val worker = Executors.newSingleThreadExecutor()
@@ -50,25 +51,29 @@ class MainActivity : Activity() {
     private val mint = Color.rgb(184, 243, 177)
     private val muted = Color.rgb(164, 183, 170)
     private var paired = false
+    private var pairingAvailable = true
+    private var playerName = ""
     private var busy = false
     private var consent = false
     private var lastPoll = 0L
     private var previousRunning = false
+    private var previousStopping = false
     private val tick = object : Runnable {
         override fun run() {
             val running = HeartRateService.running
-            if (previousRunning && !running) status.text = HeartRateService.statusMessage
+            if ((previousRunning && !running) || (previousStopping && !HeartRateService.stopping)) status.text = HeartRateService.statusMessage
             previousRunning = running
-            if (running) status.text = HeartRateService.statusMessage
+            previousStopping = HeartRateService.stopping
+            if (running || HeartRateService.stopping) status.text = HeartRateService.statusMessage
             else if (HeartRateService.startFailure != null) status.text = HeartRateService.startFailure
             if (!running && api.ingestToken.isEmpty() && paired) {
                 paired = false
                 code.text = ""
                 status.text = HeartRateService.statusMessage
             }
-            if (!running && !paired && api.pairingCode.isNotEmpty()) showPairingLink()
+            if (api.pairingCode.isNotEmpty()) showPairingLink()
             refreshControls()
-            if (!running && api.ingestToken.isNotEmpty() && !busy && SystemClock.elapsedRealtime() - lastPoll > 5000) poll()
+            if (!running && !HeartRateService.stopping && api.ingestToken.isNotEmpty() && !busy && SystemClock.elapsedRealtime() - lastPoll > 5000) poll()
             handler.postDelayed(this, 1000)
         }
     }
@@ -105,9 +110,8 @@ class MainActivity : Activity() {
         }
         start = button(layout, "▶  Start", primary = true) {
             if (HeartRateService.running) {
-                stopService(Intent(this, HeartRateService::class.java))
-                previousRunning = false
-                status.text = "Sesi dihentikan."
+                startService(Intent(this, HeartRateService::class.java).setAction(HeartRateService.STOP))
+                status.text = "Menghentikan sesi sensor…"
             } else disclose()
         }
         status = label(layout, "Hubungkan jam ke web\nuntuk memulai sesi.", 11f, muted).apply {
@@ -135,11 +139,16 @@ class MainActivity : Activity() {
             try { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("${api.origin}/privacy"))) }
             catch (_: Exception) { AlertDialog.Builder(this).setMessage("Buka ${api.origin}/privacy di browser. BPM dikirim saat Start, hanya pembacaan terbaru disimpan sementara. Tautan overlay memungkinkan orang lain melihat BPM Anda.").setPositiveButton("OK", null).show() }
         }
-        reset = button(layout, "Reset pairing") {
-            AlertDialog.Builder(this).setTitle("Reset pairing?")
-                .setMessage("Hapus pairing dan cabut tautan overlay? Hentikan sesi terlebih dahulu.")
-                .setPositiveButton("Hapus") { _, _ -> resetPairing() }.setNegativeButton("Batal", null).show()
+        reset = button(layout, "Reset kode akses") {
+            AlertDialog.Builder(this).setTitle("Reset kode akses?")
+                .setMessage("Kode baru akan menggantikan kode lama. Semua akses browser dan tautan OBS lama dicabut. Hubungkan kembali web dengan kode baru.")
+                .setPositiveButton("Reset kode") { _, _ -> resetPairing() }.setNegativeButton("Batal", null).show()
         }.apply { setTextColor(Color.rgb(255, 180, 167)) }
+        disconnect = button(layout, "Hapus koneksi") {
+            AlertDialog.Builder(this).setTitle("Hapus koneksi?")
+                .setMessage("Hapus perangkat ini dari server dan cabut seluruh aksesnya?")
+                .setPositiveButton("Hapus") { _, _ -> deleteRegistration() }.setNegativeButton("Batal", null).show()
+        }
         if (BuildConfig.DEBUG) serverButton = button(layout, "Server pengembangan") { editServer() }
         label(layout, "Sesi maksimal 4 jam.\nKendali selalu di tangan Anda.", 10f, muted).setPadding(dp(5), dp(15), dp(5), 0)
         refreshControls()
@@ -182,22 +191,23 @@ class MainActivity : Activity() {
     }
     private fun refreshControls() {
         val running = HeartRateService.running
+        val stopping = HeartRateService.stopping
         val fresh = SystemClock.elapsedRealtime() - HeartRateService.lastMeasurement < 15_000
         val value = if (running && fresh) HeartRateService.bpm else null
         val live = value != null && HeartRateService.statusMessage == "BPM terkirim"
         dial.update(value, live, if (live) "● LIVE" else if (value != null) "BPM TERBACA" else if (running) "MEMBACA SENSOR" else "HEART RATE")
         dial.visibility = if (paired || running) View.VISIBLE else View.GONE
         start.visibility = if (paired || running) View.VISIBLE else View.GONE
-        start.text = if (running) "■  Stop sesi" else "▶  Start"
+        start.text = if (stopping) "Menghentikan…" else if (running) "■  Stop sesi" else "▶  Start"
         start.contentDescription = if (running) "Stop, hentikan pembagian BPM" else "Start, mulai membagikan BPM"
-        enable(start, running || (paired && !busy))
-        register.visibility = if (paired || running) View.GONE else View.VISIBLE
-        register.text = if (busy) "Menghubungkan…" else if (api.pairingCode.isNotEmpty()) "Perbarui kode" else "Tampilkan kode"
-        enable(register, !running && !busy)
-        enable(reset, !running && !busy && api.ingestToken.isNotEmpty())
-        serverButton?.let { enable(it, !running && !busy && api.ingestToken.isEmpty()) }
-        if (paired) pairingTitle.text = "PEMAIN TERHUBUNG"
-        else if (api.pairingCode.isEmpty()) {
+        enable(start, !stopping && (running || (paired && !busy)))
+        register.visibility = if (api.ingestToken.isNotEmpty() || running || stopping) View.GONE else View.VISIBLE
+        register.text = if (busy) "Menghubungkan…" else "Tampilkan kode"
+        enable(register, !running && !stopping && !busy)
+        enable(reset, !running && !stopping && !busy && api.ingestToken.isNotEmpty())
+        enable(disconnect, !running && !stopping && !busy && api.ingestToken.isNotEmpty())
+        serverButton?.let { enable(it, !running && !stopping && !busy && api.ingestToken.isEmpty()) }
+        if (api.pairingCode.isEmpty()) {
             pairingTitle.text = "HUBUNGKAN KE WEB"
             code.visibility = View.GONE
             pairingHint.text = "Tampilkan kode, lalu buka\ntautannya di browser Anda."
@@ -214,14 +224,14 @@ class MainActivity : Activity() {
         }
     }
     private fun connect() {
-        if (HeartRateService.running) return
+        if (HeartRateService.running || HeartRateService.stopping) return
         status.text = "Menyiapkan koneksi…"
         runTask {
             if (api.ingestToken.isEmpty()) api.register()
             else {
                 try {
-                    val state = api.request("/api/device/status")
-                    if (!state.getBoolean("paired")) api.renewPairing()
+                    api.request("/api/device/status")
+                    if (api.pairingCode.isEmpty()) error("Tekan Reset kode akses untuk membuat kode baru.")
                 } catch (error: ApiException) {
                     if (error.status != 401) throw error
                     api.clearRegistration(); api.register()
@@ -249,44 +259,47 @@ class MainActivity : Activity() {
         runOnUiThread {
             val wasPaired = paired
             paired = data.getBoolean("paired")
-            if (paired) {
-                code.visibility = View.VISIBLE
-                code.alpha = 1f
-                code.typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
-                code.textSize = 16f
-                code.text = data.getString("playerName")
-                pairingHint.text = "Overlay siap digunakan.\nSalin tautannya dari web ke OBS."
-                if (!HeartRateService.running) status.text = HeartRateService.startFailure ?: "Siap untuk stream.\nTekan Start untuk berbagi."
-                if (!wasPaired) scroll.post { scroll.smoothScrollTo(0, 0) }
-            } else {
-                status.text = "Hubungkan kode ini\nmelalui browser Anda."
-                showPairingLink()
+            pairingAvailable = data.optBoolean("pairingAvailable", true)
+            playerName = data.getString("playerName")
+            showPairingLink()
+            if (!HeartRateService.running && !HeartRateService.stopping) {
+                status.text = HeartRateService.startFailure ?: if (paired) "Siap untuk stream.\nTekan Start untuk berbagi." else "Hubungkan kode ini\nmelalui browser Anda."
             }
+            if (paired && !wasPaired) scroll.post { scroll.smoothScrollTo(0, 0) }
             refreshControls()
         }
     }
     private fun showPairingLink() {
-        val seconds = ((api.expiresAt - System.currentTimeMillis()) / 1000).coerceAtLeast(0)
         val formatted = api.pairingCode.chunked(4).joinToString("-")
-        pairingTitle.text = if (seconds == 0L) "KODE KEDALUWARSA" else "PAIRING · ${seconds / 60}:${(seconds % 60).toString().padStart(2, '0')}"
+        pairingTitle.text = if (pairingAvailable) "KODE · TANPA KEDALUWARSA" else "KODE LAMA SUDAH DIPAKAI"
         code.visibility = View.VISIBLE
         code.typeface = Typeface.create("monospace", Typeface.BOLD)
         code.textSize = 19f
-        code.text = formatted
-        code.alpha = if (seconds == 0L) .4f else 1f
-        pairingHint.text = if (seconds == 0L) "Tekan Perbarui kode\nuntuk tautan baru." else "Buka di browser:\n${api.origin}/$formatted"
+        code.text = if (pairingAvailable) formatted else "—"
+        code.alpha = 1f
+        pairingHint.text = if (!pairingAvailable) "Tekan Reset kode akses\nuntuk kode yang dapat dipakai ulang."
+            else (if (paired) "$playerName terhubung.\n" else "") + "Buka di browser:\n${api.origin}/$formatted\nBerlaku sampai direset."
     }
     private fun resetPairing() {
-        if (HeartRateService.running) return
+        if (HeartRateService.running || HeartRateService.stopping) return
+        runTask {
+            api.resetPairing()
+            HeartRateService.startFailure = null
+            updateStatus()
+        }
+    }
+    private fun deleteRegistration() {
+        if (HeartRateService.running || HeartRateService.stopping) return
         runTask {
             try { api.request("/api/device/registration", "DELETE") }
             catch (error: ApiException) { if (error.status != 401) throw error }
             api.clearRegistration()
-            runOnUiThread { paired = false; code.text = ""; status.text = "Pairing dihapus.\nSiap dihubungkan kembali." }
+            HeartRateService.startFailure = null
+            runOnUiThread { paired = false; code.text = ""; status.text = "Koneksi dihapus.\nSiap dihubungkan kembali." }
         }
     }
     private fun editServer() {
-        if (HeartRateService.running || api.ingestToken.isNotEmpty()) return
+        if (HeartRateService.running || HeartRateService.stopping || api.ingestToken.isNotEmpty()) return
         val input = EditText(this).apply { setText(api.origin); inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_URI }
         AlertDialog.Builder(this).setTitle("Alamat server").setView(input).setPositiveButton("Simpan") { _, _ ->
             try { api.setOrigin(input.text.toString()); status.text = "Server disimpan." }
@@ -295,7 +308,7 @@ class MainActivity : Activity() {
     }
     private fun disclose() {
         AlertDialog.Builder(this).setTitle("Bagikan detak jantung?")
-            .setMessage("Saat sesi aktif, PulseStage membaca BPM dan mengirimkannya ke ${api.origin}. Pemilik tautan overlay dan penonton siaran dapat melihat BPM Anda. Server menyimpan pembacaan terbaru sementara, tanpa riwayat BPM. Tekan Stop kapan saja.")
+            .setMessage("Saat sesi aktif, PulseStage membaca BPM dan mengirimkannya ke ${api.origin}. Pemilik tautan overlay dan penonton siaran dapat melihat BPM Anda. Server menyimpan pembacaan terbaru sementara, tanpa riwayat BPM. Streaming memakai sesi aktivitas Wear OS, tanpa GPS. Hentikan olahraga di aplikasi lain terlebih dahulu. Tekan Stop kapan saja.")
             .setPositiveButton("Setuju & lanjut") { _, _ -> consent = true; ensurePermissions() }
             .setNegativeButton("Batal", null).show()
     }
@@ -313,7 +326,7 @@ class MainActivity : Activity() {
         else status.text = "Izin heart rate diperlukan untuk memulai."
     }
     private fun begin() {
-        if (!paired || !consent || isFinishing) return
+        if (!paired || !consent || isFinishing || HeartRateService.running || HeartRateService.stopping) return
         consent = false
         HeartRateService.startFailure = null
         try { startForegroundService(Intent(this, HeartRateService::class.java)); status.text = "Memulai sensor…" }

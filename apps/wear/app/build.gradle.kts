@@ -4,6 +4,9 @@ plugins {
 }
 
 dependencies {
+    implementation("androidx.health:health-services-client:1.1.0")
+    // Health Services exposes this type, but declares it only as a runtime dependency.
+    implementation("com.google.guava:listenablefuture:1.0")
     testImplementation("junit:junit:4.13.2")
 }
 
@@ -20,8 +23,8 @@ android {
         applicationId = "dev.pulsestage.wear"
         minSdk = 30
         targetSdk = 36
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = 2
+        versionName = "0.1.1"
         buildConfigField("String", "BACKEND_URL", "\"$backendUrl\"")
     }
     buildFeatures { buildConfig = true }

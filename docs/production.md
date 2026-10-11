@@ -14,6 +14,8 @@ Prototipe menggunakan Node.js 24, HTTP bawaan, SQLite, serta SSE satu arah. WebS
 
 ## Deployment awal satu server
 
+Pilih konfigurasi sesuai VPS: `infra/compose.yaml` menyediakan Caddy dan membutuhkan port 80/443 yang tersedia; jika VPS sudah memakai Nginx, gunakan [mode Nginx](#deployment-dengan-nginx-yang-sudah-ada) di bawah.
+
 1. Siapkan satu VPS Linux dan domain/subdomain, misalnya `pulse.domain-anda.com`. Arahkan record DNS **A** ke IPv4 VPS. Jika menggunakan record **AAAA**, pastikan IPv6 tersebut juga mengarah ke VPS dan bisa dijangkau. Izinkan koneksi TCP 80/443 ke Caddy; port API 3000 tetap berada dalam jaringan container.
 2. Instal Docker Engine beserta Compose plugin. Untuk Ubuntu, ikuti [instalasi resmi Docker](https://docs.docker.com/engine/install/ubuntu/). Pastikan akun deployment dapat menjalankan `docker version` dan `docker compose version`.
 3. Pastikan perubahan lokal sudah di-push ke GitHub, lalu clone repository pada VPS:
@@ -84,6 +86,83 @@ docker compose --env-file infra/.env -f infra/compose.yaml ps
 ```
 
 Volume database dan sertifikat tetap dipakai saat container dibuat ulang. Restart menghentikan sesi BPM yang ada di memori, sedangkan pairing tetap tersimpan di SQLite. Periksa kembali `/healthz` dan sesi jam setelah update. Jangan gunakan `down -v` untuk update rutin karena opsi tersebut menghapus named volumes.
+
+## Deployment dengan Nginx yang sudah ada
+
+Gunakan mode ini jika Nginx dipasang langsung pada VPS, termasuk melalui panel hosting. Nginx tetap melayani port 80/443; aplikasi Docker tersedia hanya melalui `127.0.0.1:3012`. File `infra/compose.nginx.yaml` mengambil konfigurasi service `app` dari file utama dan tidak menyertakan service Caddy. Jalankan file ini **sendiri**, bukan digabung dengan `-f infra/compose.yaml`.
+
+1. Setelah perubahan terbaru sudah di-push, jalankan `git pull --ff-only origin main` pada VPS. Isi `/opt/pulse-stage/infra/.env` (sesuaikan lokasi clone) dengan:
+
+   ```dotenv
+   DOMAIN=ps.triyadi.dev
+   APP_PORT=3012
+   ```
+
+   `DOMAIN` tetap hostname tanpa skema/path. `APP_PORT` adalah port localhost pada VPS; port proses di dalam container tetap 3000. Variabel `PORT` pada `.env` root tidak dipakai untuk pemetaan ini.
+
+2. Jika sempat menjalankan mode Caddy dan mendapat error `failed to bind host port 0.0.0.0:80`, hapus hanya service Caddy dari proyek PulseStage:
+
+   ```sh
+   cd /opt/pulse-stage
+   docker compose --env-file infra/.env -f infra/compose.yaml rm --stop --force proxy
+   ```
+
+   Perintah ini tidak menghapus volume SQLite maupun sertifikat. Untuk instalasi baru yang belum pernah menjalankan Caddy, lewati langkah ini. Tidak perlu menghentikan Nginx atau situs lain di VPS.
+
+3. Validasi lalu jalankan aplikasi menggunakan file mode Nginx:
+
+   ```sh
+   docker compose --env-file infra/.env -f infra/compose.nginx.yaml config --quiet
+   docker compose --env-file infra/.env -f infra/compose.nginx.yaml up -d --build
+   docker compose --env-file infra/.env -f infra/compose.nginx.yaml ps
+   curl -fsS http://127.0.0.1:3012/healthz
+   ```
+
+   Respons health check adalah `{"ok":true}`. Nama project tetap `deploy` dan database memakai volume `deploy_pulse_data` yang sama. Jika sebelumnya menggunakan nama project khusus, pertahankan nilai `-p`/`COMPOSE_PROJECT_NAME` tersebut.
+
+4. Atur virtual host `ps.triyadi.dev` pada Nginx/panel agar meneruskan request ke `http://127.0.0.1:3012`. Contoh lengkap tersedia di `infra/nginx/pulsestage.conf.example`. Untuk virtual host HTTPS yang sudah ada, pertahankan sertifikat dan konfigurasi TLS-nya, lalu gunakan direktif `access_log off;` dan blok berikut pada host tersebut:
+
+   ```nginx
+   location / {
+       proxy_pass http://127.0.0.1:3012;
+       proxy_http_version 1.1;
+       proxy_set_header Host $host;
+       proxy_set_header X-Real-IP $remote_addr;
+       proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+       proxy_set_header X-Forwarded-Proto $scheme;
+       proxy_set_header Connection "";
+       proxy_buffering off;
+       proxy_cache off;
+       proxy_read_timeout 75s;
+       gzip off;
+   }
+   ```
+
+   `proxy_buffering off` meneruskan pembaruan SSE segera setelah diterima. `access_log off` mencegah pencatatan URL overlay di access log. Error log/proxy lain tetap perlu ditinjau agar tidak menyimpan URL rahasia. Lihat [dokumentasi proxy Nginx](https://nginx.org/en/docs/http/ngx_http_proxy_module.html#proxy_buffering).
+
+   Jika memakai panel, simpan pengaturan melalui panel agar tidak ditimpa saat panel memperbarui konfigurasi. Pada instalasi Nginx systemd biasa, validasi sebelum reload:
+
+   ```sh
+   sudo nginx -t && sudo systemctl reload nginx
+   ```
+
+5. Jika domain belum memiliki virtual host, gunakan template HTTP di atas sebagai konfigurasi situs baru dan ganti `pulse.example.com` dengan hostname Anda. Aktifkan HTTPS melalui panel atau, jika Certbot dan plugin Nginx sudah terpasang, jalankan:
+
+   ```sh
+   sudo certbot --nginx -d ps.triyadi.dev --redirect
+   ```
+
+   Domain harus mengarah ke VPS dan port 80/443 dapat dijangkau. Plugin Nginx memakai Nginx yang sudah berjalan; tidak perlu memakai mode standalone yang membutuhkan port 80 kosong. Ikuti [panduan Certbot Nginx](https://eff-certbot.readthedocs.io/en/stable/using.html#nginx) untuk instalasi/pembaruan sertifikat. Contoh `.conf` HTTP merupakan langkah bootstrap; layanan pengguna tetap memakai HTTPS sesuai `PUBLIC_ORIGIN`.
+
+6. Setelah HTTPS aktif, verifikasi `curl -fsS https://ps.triyadi.dev/healthz`, pairing, dan pembaruan BPM di OBS. Seluruh build jam menggunakan `-PbackendUrl=https://ps.triyadi.dev`, tanpa port 3012.
+
+Untuk update rutin, selalu pakai file mode Nginx:
+
+```sh
+git pull --ff-only origin main
+docker compose --env-file infra/.env -f infra/compose.nginx.yaml up -d --build
+docker compose --env-file infra/.env -f infra/compose.nginx.yaml logs --tail=100 app
+```
 
 ## Batas sebelum membuka layanan ke banyak pengguna
 

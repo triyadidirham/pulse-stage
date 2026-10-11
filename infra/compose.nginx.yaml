@@ -1,0 +1,14 @@
+# Use this file on its own when Nginx already runs on the host.
+# Preserve the existing Compose project and SQLite volume when switching modes.
+name: deploy
+
+services:
+  app:
+    extends:
+      file: compose.yaml
+      service: app
+    ports:
+      - "127.0.0.1:${APP_PORT:-3012}:3000"
+
+volumes:
+  pulse_data:

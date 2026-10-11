@@ -1,5 +1,6 @@
 # Preserve the project identity originally inferred from deploy/compose.yaml.
 # Moving the file must not silently switch to new, empty named volumes.
+# If Nginx already uses host ports 80/443, use compose.nginx.yaml instead.
 name: deploy
 
 services:

@@ -132,6 +132,8 @@ Lihat [panduan produksi dan Play Store](docs/production.md) untuk deployment HTT
 
 Deployment Compose menggunakan template `infra/.env.example`; salin ke `infra/.env` dan isi `DOMAIN` sesuai hostname VPS. Panduan produksi memuat langkah clone, menjalankan layanan, pengecekan HTTPS, serta update deployment.
 
+Jika VPS sudah menjalankan Nginx, gunakan `infra/compose.nginx.yaml` dengan `APP_PORT=3012`. Mode ini hanya menjalankan aplikasi pada `127.0.0.1:3012`; Nginx menyediakan HTTPS. Lihat [panduan mode Nginx](docs/production.md#deployment-dengan-nginx-yang-sudah-ada) dan contoh `infra/nginx/pulsestage.conf.example`.
+
 Pesan commit baru mengikuti [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/), misalnya `feat(web): add overlay color selection` atau `fix(wear): reconnect after a network interruption`. Aturan lengkap tersimpan di [AGENTS.md](AGENTS.md).
 
 ## Struktur proyek
@@ -174,7 +176,9 @@ packages/
 infra/
   docker/Dockerfile           Image server dan web
   compose.yaml                Deployment aplikasi, Caddy, dan volume
+  compose.nginx.yaml          Aplikasi untuk Nginx yang sudah ada di VPS
   Caddyfile                   Reverse proxy HTTPS
+  nginx/                      Contoh virtual host Nginx
 scripts/                      Simulator dan alat pengembangan
 docs/                        Kontrak API dan panduan produksi
 data/                        SQLite lokal (diabaikan Git)
@@ -187,7 +191,7 @@ Tes diletakkan bersama pemilik kodenya. Jalankan `npm test` untuk semua tes, `np
 
 Folder Wear OS dibuka di Android Studio melalui **`apps/wear/`**. Namespace dan application ID tetap `dev.pulsestage.wear`; package kelas internal kini dipisahkan sesuai tanggung jawabnya. Data pairing yang tersimpan tidak dipindahkan. Output Gradle tetap berada di `apps/wear/app/build/`.
 
-Deployment dari root repository:
+Deployment dengan Caddy dari root repository:
 
 ```sh
 docker build -f infra/docker/Dockerfile -t pulsestage .

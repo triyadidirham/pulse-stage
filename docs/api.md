@@ -15,6 +15,7 @@ Semua request berisi JSON menggunakan `Content-Type: application/json`. Endpoint
 | `POST /api/manage/rotate-overlay` | Manage | Menghasilkan `overlayToken` baru, mencabut seluruh token overlay lama dan menutup stream lama |
 | `DELETE /api/manage` | Manage | Menghapus registrasi dan mencabut seluruh kredensial |
 | `GET /api/stream` | Overlay | SSE berisi snapshot saat ini dan pembaruan berikutnya |
+| `GET /api/snapshot` | Overlay | Snapshot JSON yang sama untuk fallback polling; maksimal 1.200 request/menit per perangkat |
 | `GET /healthz` | Tidak ada | Pemeriksaan proses untuk reverse proxy/container |
 
 `measuredAt` adalah Unix epoch dalam milidetik. `expiresAt` selalu `null`: kode pairing dapat digunakan ulang tanpa batas waktu, sampai direset atau perangkat dihapus. `sequence` adalah bilangan bulat yang meningkat dalam satu sesi. Nilai BPM diterima dalam rentang teknis 20–300; batas ini bukan klasifikasi kondisi medis. Pembacaan lama, sesi tidak cocok, dan nomor urut duplikat ditolak. Respons sukses ingest adalah HTTP 202.
@@ -27,11 +28,12 @@ Snapshot SSE:
   "status": "live",
   "bpm": 95,
   "measuredAt": 1791712800000,
-  "serverTime": 1791712800100
+  "serverTime": 1791712800100,
+  "validForMs": 14900
 }
 ```
 
-`status` adalah `live`, `waiting`, atau `stopped`. Saat tidak live, `bpm` dan `measuredAt` adalah `null`. Stream lama menerima `event: revoked` lalu ditutup ketika aksesnya dicabut. Client harus menghentikan percobaan otomatis pada HTTP 401. Gangguan jaringan dapat dicoba kembali dengan jeda bertahap.
+`status` adalah `live`, `waiting`, atau `stopped`. Saat tidak live, `bpm` dan `measuredAt` adalah `null`. Stream lama menerima `event: revoked` lalu ditutup ketika aksesnya dicabut. Client harus menghentikan SSE dan polling pada HTTP 401. `validForMs` adalah sisa umur BPM saat snapshot dibuat, maksimum 15.000 ms dan 0 bila tidak live. Client memakai timer monotonic untuk menghapus angka ketika sisa waktu habis, dan tidak memperpanjang deadline untuk pengukuran yang sama. Client lama masih dapat memakai `serverTime - measuredAt` sebagai umur pembacaan. Gangguan jaringan dicoba kembali dengan jeda bertahap. Polling memakai header Authorization yang sama, tanpa token pada query string dan tanpa cache. Respons terlambat dengan `serverTime` lebih tua daripada snapshot terakhir diabaikan.
 
 Dashboard menggunakan `fetch()` streaming untuk mengirim header Authorization. URL OBS baru berbentuk `/<overlayToken>`; JavaScript membaca token dari path, lalu menggunakannya dalam header stream. URL sebelumnya `/overlay#token=...` tetap didukung. Keduanya memberi akses baca yang sama dan dicabut oleh rotasi token yang sama. Path URL baru mengandung kredensial: matikan atau redaksi access log untuk path tersebut. Tautan yang memakai fragment tidak mengirim token dalam request URL.
 

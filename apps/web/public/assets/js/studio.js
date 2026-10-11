@@ -8,7 +8,6 @@ let saved;
 let theme = 'mint';
 try { saved = JSON.parse(localStorage.getItem(key)); theme = normalizeTheme(localStorage.getItem(themeKey)); } catch { saved = null; }
 let disconnect;
-let lastUpdate = 0;
 let overlayPrepared = false;
 let copyTimer;
 function message(text, error = false) {
@@ -30,7 +29,6 @@ function updateSteps(live = false) {
   $('step-live').dataset.state = live ? 'done' : (paired && overlayPrepared ? 'current' : '');
 }
 function clearBpm(status, note) {
-  lastUpdate = 0;
   $('preview-bpm').textContent = '--';
   $('preview-status').textContent = status;
   $('preview-card').dataset.state = 'idle';
@@ -67,24 +65,36 @@ function render() {
   updateTheme();
   if (!connected) return;
   $('connected-name').textContent = saved.playerName;
+  let connectionState = 'connecting';
   disconnect = subscribe(saved.overlayToken, {
     onData(data) {
-      lastUpdate = Date.now();
       $('preview-name').textContent = data.playerName;
-      $('preview-bpm').textContent = data.bpm ?? '--';
-      $('preview-status').textContent = { live: 'LIVE', waiting: 'MENUNGGU SENSOR', stopped: 'SESI BERHENTI' }[data.status] || 'MENUNGGU JAM';
-      $('preview-card').dataset.state = data.status;
-      $('preview-note').textContent = {
+      const connected = connectionState === 'connected';
+      const usable = connected || connectionState === 'reconnecting';
+      $('preview-bpm').textContent = usable ? data.bpm ?? '--' : '--';
+      $('preview-status').textContent = connected
+        ? { live: 'LIVE', waiting: 'MENUNGGU SENSOR', stopped: 'SESI BERHENTI' }[data.status] || 'MENUNGGU JAM'
+        : connectionState === 'reconnecting' ? 'MENYAMBUNG ULANG' : 'TERPUTUS';
+      $('preview-card').dataset.state = connected ? data.status : 'idle';
+      $('preview-note').textContent = !connected ? 'Koneksi sedang dipulihkan. Pembacaan lama akan disembunyikan otomatis.' : {
         live: 'Sesi aktif. Angka di preview berasal dari sensor jam Anda.',
         waiting: 'Sesi aktif, menunggu pembacaan baru. Pastikan jam terpasang dengan nyaman.',
         stopped: 'Sesi berhenti. Tekan Start di jam saat Anda siap kembali.'
       }[data.status] || 'Menunggu pembacaan dari jam.';
-      updateSteps(data.status === 'live');
+      updateSteps(connected && data.status === 'live');
     },
     onStatus(status) {
-      $('connection-status').textContent = { connected: 'Server terhubung', disconnected: 'Menyambung ulang…', revoked: 'Akses dicabut' }[status];
+      connectionState = status;
+      $('connection-status').textContent = { connecting: 'Menghubungkan…', connected: 'Server terhubung', reconnecting: 'Menyambung ulang…', disconnected: 'Koneksi terputus', revoked: 'Akses dicabut' }[status];
       $('connection-status').dataset.state = status;
-      if (status !== 'connected') clearBpm(status === 'revoked' ? 'AKSES DICABUT' : 'TERPUTUS', status === 'revoked' ? 'Tautan overlay sudah tidak berlaku. Hubungkan ulang atau gunakan tautan terbaru.' : 'Koneksi terputus. Preview akan kembali saat server dapat dijangkau.');
+      if (status === 'connecting') clearBpm('MENGHUBUNGKAN', 'Menyiapkan koneksi ke jam…');
+      if (status === 'reconnecting') {
+        $('preview-status').textContent = 'MENYAMBUNG ULANG';
+        $('preview-card').dataset.state = 'idle';
+        $('preview-note').textContent = 'Koneksi sedang dipulihkan. Pembacaan lama akan disembunyikan otomatis.';
+        updateSteps();
+      }
+      if (status === 'disconnected' || status === 'revoked') clearBpm(status === 'revoked' ? 'AKSES DICABUT' : 'TERPUTUS', status === 'revoked' ? 'Tautan overlay sudah tidak berlaku. Hubungkan ulang atau gunakan tautan terbaru.' : 'Koneksi terputus. Preview akan kembali saat server dapat dijangkau.');
       if (status === 'revoked') api('/api/manage').catch(error => {
         if (error.status === 401) { forget(); message('Pairing dicabut. Masukkan kode baru dari jam.'); }
       });
@@ -146,7 +156,6 @@ $('delete-device').addEventListener('click', async () => {
   } catch (error) { if (error.status === 401) forget(); message(error.message, true); }
   finally { $('delete-device').disabled = false; }
 });
-setInterval(() => { if (lastUpdate && Date.now() - lastUpdate > 15_000) clearBpm('TERPUTUS', 'Belum ada pembaruan dari server. Periksa koneksi jam dan komputer.'); }, 1000);
 render();
 if (incomingCode) {
   $('pair-code').value = `${incomingCode.slice(0, 4)}-${incomingCode.slice(4)}`;

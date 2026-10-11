@@ -268,3 +268,36 @@ test('legacy database migration preserves access and removes expiry from pending
   assert.equal((await again.request('/api/manage', { token: manage })).status, 401);
   assert.equal((await again.request('/api/pair', { method: 'POST', body: { code: reset.data.pairingCode, playerName: 'Legacy' } })).status, 200);
 });
+
+test('read-only snapshot fallback follows stream state and credential revocation', async t => {
+  const f = await fixture(t);
+  const d = await f.pair();
+  for (const invalid of [undefined, d.ingestToken, d.manageToken]) {
+    assert.equal((await f.request('/api/snapshot', { token: invalid })).status, 401);
+  }
+  const read = () => f.request('/api/snapshot', { token: d.overlayToken });
+  assert.equal((await read()).data.status, 'stopped');
+  const { data: session } = await f.request('/api/device/session', { method: 'POST', token: d.ingestToken, body: { active: true } });
+  assert.equal((await read()).data.status, 'waiting');
+  const measuredAt = f.time() - 4000;
+  await f.request('/api/device/samples', { method: 'POST', token: d.ingestToken, body: { sessionId: session.sessionId, bpm: 87, sequence: 1, measuredAt } });
+  const live = await read();
+  assert.equal(live.data.bpm, 87);
+  assert.equal(live.data.measuredAt, measuredAt);
+  assert.equal(live.data.validForMs, 11_000);
+  const response = await f.transport('/api/stream', { headers: { Authorization: `Bearer ${d.overlayToken}` } });
+  assert.equal(response.headers.get('x-accel-buffering'), 'no');
+  assert.match(response.headers.get('cache-control'), /no-transform/);
+  const reader = response.body.getReader();
+  const initial = new TextDecoder().decode((await reader.read()).value);
+  assert.deepEqual(JSON.parse(initial.slice(6).trim()), live.data);
+  await reader.cancel();
+  f.advance(11_000);
+  assert.equal((await read()).data.status, 'waiting');
+  assert.equal((await read()).data.bpm, null);
+  assert.equal((await read()).data.validForMs, 0);
+  await f.request('/api/device/session', { method: 'POST', token: d.ingestToken, body: { active: false, sessionId: session.sessionId } });
+  assert.equal((await read()).data.status, 'stopped');
+  await f.request('/api/manage/rotate-overlay', { method: 'POST', token: d.manageToken });
+  assert.equal((await read()).status, 401);
+});

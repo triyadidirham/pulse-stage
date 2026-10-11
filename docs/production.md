@@ -220,3 +220,12 @@ Kode pairing dapat dipakai berulang kali tanpa kedaluwarsa; reset menolak kode d
 Cadangkan database SQLite beserta WAL secara konsisten sebelum upgrade. Deploy image backend/web terbaru tanpa menghapus volume data, lalu build/install APK baru. Schema kredensial dimigrasikan otomatis; akses browser dan OBS yang sudah ada tetap berlaku. Kode yang belum diklaim menjadi tanpa kedaluwarsa. Jika kode lama sudah dikonsumsi, gunakan Reset kode akses dari APK baru dan pairing ulang; langkah ini juga mencabut URL OBS lama. Jangan rollback backend lama dengan database yang sudah dimigrasikan: pulihkan backup versi sebelumnya terlebih dahulu.
 
 Uji Start/Stop pada jam, termasuk layar mati dan Stop ketika Health Services masih memulai sesi. Tutup sesi olahraga aplikasi lain sebelum Start. Lihat log `PulseStageSensor` dan `PulseStageHealth` serta petunjuk build di README. APK lama tidak mendukung respons pairing `expiresAt:null`.
+
+
+### Jika overlay terlambat atau sempat terputus
+
+Backend/web terbaru menyediakan fallback snapshot ketika SSE tersendat. Deploy keduanya bersama, kemudian refresh halaman studio dan Browser Source OBS. Tidak perlu mengganti kode pairing atau membangun ulang APK untuk perubahan transport overlay.
+
+Pastikan blok `location` pada virtual host **HTTPS** yang benar memakai `proxy_buffering off`, `proxy_cache off`, `gzip off`, dan `proxy_read_timeout 75s` seperti contoh Nginx di atas. Menonaktifkan buffering hanya pada host HTTP yang me-redirect ke HTTPS tidak memengaruhi SSE di HTTPS. Backend mengirim `X-Accel-Buffering: no` dan `Cache-Control: no-store, no-transform`. Periksa proxy/CDN tambahan jika digunakan.
+
+Status **MENYAMBUNG ULANG** berarti koneksi sedang dipulihkan; BPM terakhir hanya dipertahankan sampai masa berlaku pengukurannya habis. Status **MENUNGGU SENSOR** dengan server terhubung berarti backend belum memiliki BPM segar, sehingga perlu melihat status pengiriman pada jam. Fallback web tidak dapat mempercepat batch sensor atau memperbaiki jaringan jam yang terputus.

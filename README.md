@@ -17,7 +17,7 @@ Status: prototipe untuk pengujian. Belum dipublikasikan ke Play Store; jalur Hea
 2. Pengguna membuka tautan tersebut di browser; kode sudah terisi. Isi nama pemain dan tekan **Hubungkan jam**. Memasukkan kode manual di halaman utama juga tetap bisa.
 3. Web menghasilkan tautan overlay pribadi berbentuk `https://domain/kode-akses-overlay` untuk Browser Source OBS.
 4. Setelah membaca penjelasan pembagian data dan memberi izin sensor, pengguna menekan **Start** di jam.
-5. Jam mengirim pembacaan BPM melalui HTTPS ke server. Server meneruskannya ke web/OBS melalui **Server-Sent Events (SSE)**.
+5. Jam mengirim pembacaan BPM melalui HTTPS ke server. Server meneruskannya ke web/OBS melalui **Server-Sent Events (SSE)**, dengan polling snapshot sebagai cadangan ketika streaming tersendat.
 6. **Stop** menghentikan sensor dan pengiriman; **Reset kode akses** di jam mengganti kode sekaligus mencabut semua akses browser/OBS lama; **Hapus pairing** di web atau **Hapus koneksi** di jam menghapus registrasi.
 
 Kode di layar jam **tidak kedaluwarsa dan dapat dipakai ulang**, termasuk untuk menghubungkan browser baru. Simpan kode seperti kata sandi: pemiliknya dapat mengelola perangkat dan membuat tautan OBS. Kredensial jam, pengelola, dan overlay memiliki hak berbeda. Tidak ada aplikasi HP pendamping yang wajib dipasang.
@@ -117,6 +117,10 @@ Dependensi `com.google.guava:guava:32.0.1-android` dideklarasikan eksplisit pada
 
 Setelah pairing, pilih **Salin tautan overlay** pada dashboard. Tambahkan **Sources → + → Browser** di OBS, tempel URL lengkap berbentuk `https://domain/kode-akses-overlay`, dan set ukuran **480 × 180**. Latar halaman overlay transparan. Tidak perlu plugin OBS khusus. Tautan lama `/overlay#token=…` juga tetap berfungsi.
 
+Jika koneksi streaming belum mengirim snapshot dalam 3 detik, web/OBS mengambil `/api/snapshot` setiap sekitar 1 detik sebagai cadangan. Jika stream yang sudah aktif tidak mengirim snapshot selama 7 detik, cadangan yang sama digunakan. SSE tetap mencoba terhubung kembali; polling dihentikan saat SSE mengirim data terbaru. Permintaan yang gagal memakai jeda bertahap. Koneksi baru dianggap terhubung setelah data diterima, bukan hanya setelah header HTTP diterima.
+
+Cadangan ini mengatasi gangguan jalur server–overlay. Pembacaan Health Services dapat datang dalam batch, dan koneksi jam ke server juga memengaruhi keterlambatan; angka tidak diprediksi atau dibuat-buat untuk mengisi jeda. Untuk memperbarui fitur ini, deploy backend/web terbaru lalu refresh halaman studio dan Browser Source OBS. APK tidak perlu dibangun ulang untuk perubahan koneksi overlay ini.
+
 Warna Coral dan Ice ditambahkan sebagai `?theme=coral` atau `?theme=ice` pada URL; tanpa parameter, warna default adalah Mint. Pilihan warna tersimpan di browser dashboard. Jika Anda mengganti warna setelah setup OBS, salin ulang URL ke Browser Source. Tombol **Buka overlay** membuka tampilan transparan di tab baru.
 
 URL pendek delapan karakter di jam dapat digunakan untuk pairing berulang kali sampai kode direset. Pairing ulang membuat akses browser baru tanpa memutus tautan OBS yang sudah terpasang. URL OBS memakai kode akses acak yang lebih panjang dan tetap berlaku sampai Anda mengganti tautan atau menghapus pairing. Membuka halaman pairing saja tidak mengklaim jam; pengguna tetap menekan **Hubungkan jam**. Ketika URL pairing dibuka pada browser yang sudah mengelola jam lain, penggantian perangkat aktif harus dikonfirmasi sebelum klaim.
@@ -132,7 +136,7 @@ Upgrade: cadangkan database, deploy server baru, lalu pasang APK terbaru. Migras
 - Wake lock hanya dipegang selama sesi aktif, maksimal 4 jam. Konsumsi baterai dan perilaku sensor saat layar mati perlu diuji pada firmware Xiaomi yang sebenarnya.
 - Jam mengirim pembacaan terbaru, maksimal sekitar sekali per detik, sesuai ketersediaan sensor. Tidak ada jaminan bahwa sensor menghasilkan pembacaan baru setiap detik.
 - Timestamp pengukuran asli dipertahankan. Tidak mengulang pembacaan lama seolah-olah baru, tidak menyimpan antrean offline, dan tidak mengirim BPM nol ketika sensor tidak valid.
-- Overlay menampilkan `--` jika data kedaluwarsa, sesi berhenti, atau koneksi gagal. Batas kedaluwarsa server 15 detik; notifikasi periodik maksimum 5 detik sesudahnya.
+- Overlay menghitung umur pembacaan dari timestamp server dan menghapus BPM setelah 15 detik sejak pengukuran. Heartbeat/reconnect tidak memperpanjang umur angka. Saat koneksi terputus sesaat, pembacaan yang masih segar tetap terlihat dengan status **MENYAMBUNG ULANG**; angka disembunyikan ketika kedaluwarsa, sesi berhenti, atau akses dicabut.
 - Jam dan server harus mempunyai waktu sistem yang benar. API menolak timestamp jauh di masa depan atau pembacaan yang sudah lebih dari 15 detik.
 - Animasi ikon jantung dekoratif; aplikasi ini mengirim angka BPM, bukan sinyal ECG atau waktu setiap denyut.
 
@@ -144,7 +148,7 @@ npm test
 RUN_HTTP_TESTS=1 npm test
 ```
 
-Tes default menggunakan handler HTTP yang sebenarnya dengan request/response stream dalam proses, tanpa membuka port. Meliputi pairing permanen, reset/revokasi semua akses, migrasi database lama, pemisahan hak kredensial, pengiriman melalui SSE, kedaluwarsa, Stop, rotasi URL, penghapusan, validasi input, pembatasan percobaan, persistensi database tanpa riwayat BPM, lokasi database, serta pemuatan aset dan modul browser dari struktur baru.
+Tes default menggunakan handler HTTP yang sebenarnya dengan request/response stream dalam proses, tanpa membuka port. Meliputi koneksi overlay yang terputus, fallback polling, respons terlambat, kedaluwarsa angka di browser, pairing permanen, reset/revokasi semua akses, migrasi database lama, pemisahan hak kredensial, pengiriman melalui SSE, kedaluwarsa, Stop, rotasi URL, penghapusan, validasi input, pembatasan percobaan, persistensi database tanpa riwayat BPM, lokasi database, serta pemuatan aset dan modul browser dari struktur baru.
 
 Di lingkungan pembuatan ini, socket lokal diblokir (`EPERM`), sehingga preview browser, transport HTTP nyata, dan Gradle daemon tidak dapat dijalankan. Kompilasi langsung Kotlin/resource Android serta verifikasi tanda tangan APK tidak menggantikan pengujian jam/OBS sebenarnya.
 

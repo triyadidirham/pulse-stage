@@ -34,13 +34,18 @@ export function createApp({ databasePath = ':memory:', publicOrigin = '', now = 
   function snapshot(device) {
     const session = live.get(device.id);
     const sample = session?.sample;
-    const fresh = session?.active && sample && now() - sample.measuredAt <= STALE_MS && now() - sample.receivedAt <= STALE_MS;
+    const serverTime = now();
+    const validForMs = session?.active && sample ? Math.max(0, Math.min(
+      STALE_MS - (serverTime - sample.measuredAt), STALE_MS - (serverTime - sample.receivedAt),
+    )) : 0;
+    const fresh = validForMs > 0;
     return {
       playerName: device.player_name,
       status: !session?.active ? 'stopped' : fresh ? 'live' : 'waiting',
       bpm: fresh ? sample.bpm : null,
       measuredAt: fresh ? sample.measuredAt : null,
-      serverTime: now(),
+      serverTime,
+      validForMs,
     };
   }
   function broadcast(id) {
@@ -162,15 +167,22 @@ export function createApp({ databasePath = ':memory:', publicOrigin = '', now = 
           return json(res, 200, { deleted: true });
         }
       }
-      if (method === 'GET' && path === '/api/stream') {
+      if (method === 'GET' && (path === '/api/stream' || path === '/api/snapshot')) {
         const device = authenticate(req, 'overlay');
+        if (path === '/api/snapshot') {
+          limit(`snapshot:${device.id}`, 1200);
+          return json(res, 200, snapshot(device));
+        }
         const set = listeners.get(device.id) || new Set();
         if (set.size >= 10) throw fail(429, 'Terlalu banyak tampilan aktif.');
         listeners.set(device.id, set);
         set.add(res);
+        req.socket.setNoDelay?.(true);
         res.writeHead(200, {
           'Content-Type': 'text/event-stream', 'Connection': 'keep-alive', 'X-Accel-Buffering': 'no',
+          'Cache-Control': 'no-store, no-transform',
         });
+        res.flushHeaders?.();
         res.write(`data: ${JSON.stringify(snapshot(device))}\n\n`);
         res.on('close', () => {
           set.delete(res);

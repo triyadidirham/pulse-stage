@@ -4,18 +4,23 @@ const bpm = document.getElementById('bpm');
 const status = document.getElementById('status');
 const card = document.getElementById('overlay-card');
 document.body.dataset.theme = normalizeTheme(new URLSearchParams(location.search).get('theme'));
-let lastUpdate = 0;
-function clear(text) { lastUpdate = 0; bpm.textContent = '--'; status.textContent = text; card.dataset.state = 'idle'; }
+let snapshot;
+let connection = 'connecting';
+function render() {
+  const usable = connection === 'connected' || connection === 'reconnecting';
+  bpm.textContent = usable ? snapshot?.bpm ?? '--' : '--';
+  card.dataset.state = connection === 'connected' ? snapshot?.status || 'idle' : 'idle';
+  status.textContent = connection === 'connected'
+    ? { live: 'LIVE', waiting: 'MENUNGGU SENSOR', stopped: 'SESI BERHENTI' }[snapshot?.status] || 'MENUNGGU JAM'
+    : { connecting: 'MENGHUBUNGKAN', reconnecting: 'MENYAMBUNG ULANG', disconnected: 'TERPUTUS', revoked: 'AKSES DICABUT', invalid: 'TAUTAN TIDAK VALID' }[connection];
+}
 const token = overlayTokenFromLocation(location);
-if (!token) clear('TAUTAN TIDAK VALID');
+if (!token) { connection = 'invalid'; render(); }
 else subscribe(token, {
   onData(data) {
-    lastUpdate = Date.now();
+    snapshot = data;
     document.getElementById('name').textContent = data.playerName;
-    bpm.textContent = data.bpm ?? '--';
-    status.textContent = { live: 'LIVE', waiting: 'MENUNGGU SENSOR', stopped: 'SESI BERHENTI' }[data.status] || 'MENUNGGU JAM';
-    card.dataset.state = data.status;
+    render();
   },
-  onStatus(state) { if (state !== 'connected') clear(state === 'revoked' ? 'AKSES DICABUT' : 'TERPUTUS'); },
+  onStatus(state) { connection = state; render(); },
 });
-setInterval(() => { if (lastUpdate && Date.now() - lastUpdate > 15_000) clear('TERPUTUS'); }, 1000);

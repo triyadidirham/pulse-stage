@@ -1,0 +1,17 @@
+node_modules/
+data/
+.env
+.env.*
+!.env.example
+.idea/
+.agents/
+.codex/
+.aws/
+artifacts/
+**/.gradle/
+**/.kotlin/
+**/build/
+**/local.properties
+*.jks
+*.keystore
+*.log

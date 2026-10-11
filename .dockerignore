@@ -1,0 +1,10 @@
+.git
+.agents
+.codex
+.aws
+data
+wear
+tests
+node_modules
+.env
+*.log
